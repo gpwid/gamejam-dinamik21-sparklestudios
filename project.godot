@@ -26,7 +26,7 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+enabled=PackedStringArray()
 
 [input]
 
@@ -82,3 +82,14 @@ interact={
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[shader_globals]
+
+tap_origin={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+tap_radius={
+"type": "float",
+"value": 0.0
+}
