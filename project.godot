@@ -19,12 +19,6 @@ config/icon="res://icon.svg"
 
 buses/default_bus_layout="uid://dwxguudplrav4"
 
-[autoload]
-
-DialogueManager="*uid://c3rodes2l3gxb"
-PhantomCameraManager="*uid://duq6jhf6unyis"
-_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
-
 [display]
 
 window/stretch/mode="canvas_items"

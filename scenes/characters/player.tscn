@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b83uw3cacuhso"]
 
-[ext_resource type="Script" uid="uid://dsrej012wr47s" path="res://scenes/characters/player.gd" id="1_rp718"]
+[ext_resource type="Script" uid="uid://dsrej012wr47s" path="res://scripts/characters/player.gd" id="1_rp718"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ol4vb"]
 
@@ -13,9 +13,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 [node name="Camera3D" type="Camera3D" parent="Head" unique_id=2034605404]
 
 [node name="Flashlight" type="SpotLight3D" parent="Head/Camera3D" unique_id=818398398]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, -0.351, 0)
+light_energy = 8.0
 shadow_enabled = true
-spot_range = 15.0
-spot_angle = 35.0
+shadow_bias = 0.05
+shadow_reverse_cull_face = true
+spot_range = 25.0
+spot_attenuation = 0.5
+spot_angle_attenuation = 0.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=214696391]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
