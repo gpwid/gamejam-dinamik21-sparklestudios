@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://d0se26gd7y5gw"]
+
+[ext_resource type="PackedScene" uid="uid://b83uw3cacuhso" path="res://scenes/characters/player.tscn" id="1_klkgc"]
+
+[sub_resource type="Environment" id="Environment_ol4vb"]
+background_mode = 1
+ambient_light_source = 2
+
+[node name="TestWorld" type="Node3D" unique_id=319136204]
+
+[node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=1141823545]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2290039, 0)
+use_collision = true
+size = Vector3(20, 0.05, 20)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=885196880]
+environment = SubResource("Environment_ol4vb")
+
+[node name="Player" parent="." unique_id=1286990361 instance=ExtResource("1_klkgc")]
