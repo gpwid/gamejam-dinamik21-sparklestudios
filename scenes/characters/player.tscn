@@ -2,11 +2,18 @@
 
 [ext_resource type="Script" uid="uid://dsrej012wr47s" path="res://scripts/characters/player.gd" id="1_rp718"]
 [ext_resource type="PackedScene" uid="uid://cviewmodel001" path="res://scenes/characters/view_model.tscn" id="2_vm"]
+[ext_resource type="AudioStream" uid="uid://bf43tkqvrrt1m" path="res://assets/audio/sfx/footstep.wav" id="3_step"]
+[ext_resource type="AudioStream" uid="uid://cmnbvo1e2klnb" path="res://assets/audio/sfx/switch.wav" id="4_switch"]
+[ext_resource type="AudioStream" uid="uid://cy0105vqsyh5j" path="res://assets/audio/sfx/echo.wav" id="5_echo"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ol4vb"]
 
 [node name="Player" type="CharacterBody3D" unique_id=1286990361]
 script = ExtResource("1_rp718")
+footstep_sounds = Array[AudioStream]([ExtResource("3_step")])
+switch_sound = ExtResource("4_switch")
+echo_sound = ExtResource("5_echo")
+landing_sound = ExtResource("3_step")
 
 [node name="Head" type="Node3D" parent="." unique_id=928181832]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
@@ -26,5 +33,19 @@ spot_angle_attenuation = 0.0
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=214696391]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 shape = SubResource("CapsuleShape3D_ol4vb")
+
+[node name="FootstepPlayer" type="AudioStreamPlayer3D" parent="." unique_id=294819283]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+max_distance = 15.0
+
+[node name="LandingPlayer" type="AudioStreamPlayer3D" parent="." unique_id=314819284]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+max_distance = 15.0
+
+[node name="FlashlightPlayer" type="AudioStreamPlayer" parent="." unique_id=424819285]
+
+[node name="TapEchoPlayer" type="AudioStreamPlayer3D" parent="." unique_id=534819286]
+max_polyphony = 4
+max_distance = 25.0
 
 [node name="ViewModel" parent="." instance=ExtResource("2_vm")]
