@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://b83uw3cacuhso"]
 
 [ext_resource type="Script" uid="uid://dsrej012wr47s" path="res://scripts/characters/player.gd" id="1_rp718"]
+[ext_resource type="PackedScene" uid="uid://cviewmodel001" path="res://scenes/characters/view_model.tscn" id="2_vm"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ol4vb"]
 
@@ -25,3 +26,5 @@ spot_angle_attenuation = 0.0
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=214696391]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 shape = SubResource("CapsuleShape3D_ol4vb")
+
+[node name="ViewModel" parent="." instance=ExtResource("2_vm")]

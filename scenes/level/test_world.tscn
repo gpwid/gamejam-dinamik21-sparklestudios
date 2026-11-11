@@ -26,6 +26,10 @@ shader_parameter/outline_thickness = 0.45
 shader_parameter/use_floor_grid = true
 shader_parameter/grid_size = 2.0
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_ol4vb"]
+height = 0.5
+radius = 1.0
+
 [sub_resource type="BoxMesh" id="BoxMesh_pkxlf"]
 size = Vector3(1, 3.3452148, 1.9870605)
 
@@ -36,7 +40,13 @@ shader_parameter/outline_thickness = 0.45
 shader_parameter/use_floor_grid = true
 shader_parameter/grid_size = 2.0
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_pkxlf"]
+size = Vector3(1, 3.3452148, 1.9870605)
+
 [sub_resource type="BoxMesh" id="BoxMesh_au0yo"]
+size = Vector3(1, 1.2561035, 0.9803467)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_au0yo"]
 size = Vector3(1, 1.2561035, 0.9803467)
 
 [node name="TestWorld" type="Node3D" unique_id=319136204]
@@ -54,6 +64,7 @@ environment = SubResource("Environment_ol4vb")
 
 [node name="CSGMesh3D" type="CSGMesh3D" parent="." unique_id=1048378567]
 transform = Transform3D(1, 0, 0, 0, 2.2825296, 0, 0, 0, 1, 2.281, 2, -6.783394)
+use_collision = true
 mesh = SubResource("CylinderMesh_6nl1r")
 material = ExtResource("3_q1j05")
 
@@ -62,17 +73,37 @@ transform = Transform3D(0.6733008, 0.7393687, 0, -0.7393687, 0.6733008, 0, 0, 0,
 mesh = SubResource("TorusMesh_ol4vb")
 surface_material_override/0 = SubResource("ShaderMaterial_3k8jb")
 
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D"]
+shape = SubResource("CylinderShape3D_ol4vb")
+
 [node name="MeshInstance3D2" type="MeshInstance3D" parent="." unique_id=1574611218]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.0638356, 1.1726074, 2.2403736)
 mesh = SubResource("BoxMesh_pkxlf")
 surface_material_override/0 = SubResource("ShaderMaterial_6oue3")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D2"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D2/StaticBody3D"]
+shape = SubResource("BoxShape3D_pkxlf")
 
 [node name="MeshInstance3D3" type="MeshInstance3D" parent="." unique_id=1581642033]
 transform = Transform3D(0.55679446, 0.8306503, 0, -0.8306503, 0.55679446, 0, 0, 0, 1, -3.0638356, 2.9209726, 2.2403736)
 mesh = SubResource("BoxMesh_pkxlf")
 surface_material_override/0 = SubResource("ShaderMaterial_6oue3")
 
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D3"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D3/StaticBody3D"]
+shape = SubResource("BoxShape3D_pkxlf")
+
 [node name="MeshInstance3D4" type="MeshInstance3D" parent="." unique_id=1608972418]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.679356, 0.12805176, 2.7437305)
 mesh = SubResource("BoxMesh_au0yo")
 surface_material_override/0 = SubResource("ShaderMaterial_6oue3")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D4"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D4/StaticBody3D"]
+shape = SubResource("BoxShape3D_au0yo")
