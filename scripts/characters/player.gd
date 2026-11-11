@@ -44,33 +44,33 @@ const SWAY_RETURN_SPEED: float = 7.0
 const SWAY_SMOOTH_SPEED: float = 11.0
 
 # ==============================================================================
-# PENGATURAN SENTER OVERHEAT & WARNING SYSTEM
+# PENGATURAN SENTER & TERMODINAMIKA (ANTI-FEATHERING)
 # ==============================================================================
+const HEAT_RATE: float = 18.0
+const COOL_RATE: float = 10.0           # Diperlambat dari 22.0/20.0 ke 10.0 per detik
+const IGNITION_HEAT_SPIKE: float = 15.0 # Penalti panas instan saat saklar dinyalakan
+const COOLING_DELAY: float = 1.8         # Jeda sebelum mulai dingin saat senter dimatikan
+const WARNING_HEAT: float = 75.0
 const MAX_HEAT: float = 100.0
-const HEAT_RATE: float = 15.0
-const COOL_RATE: float = 20.0
-const WARNING_HEAT: float = 70.0
-const CRITICAL_HEAT: float = 85.0
 const OVERHEAT_COOLDOWN: float = 4.0
-
-# Interval Flicker Heat Warning (~0.12s interval pencegah strobe hazard)
-const WARNING_INTERVAL_MIN: float = 0.10
-const WARNING_INTERVAL_MAX: float = 0.14
-
-# Interval Flicker Critical Warning (Intens & tidak teratur)
-const CRITICAL_LIGHT_TIME_MIN: float = 0.06
-const CRITICAL_LIGHT_TIME_MAX: float = 0.14
-const CRITICAL_DROP_TIME_MIN: float = 0.04
-const CRITICAL_DROP_TIME_MAX: float = 0.09
+const FLICKER_INTERVAL: float = 0.08    # Interval flicker 0.08s untuk kedipan nyata
 
 # ==============================================================================
-# PENGATURAN GELOMBANG ECHOLOCATION (DOUBLE-WAVE & AFTERGLOW TRAIL)
+# PENGATURAN ECHOLOCATION DYNAMICS (WALL TAP VS FLOOR FALLBACK)
 # ==============================================================================
-const TAP_REACH_DISTANCE: float = 3.0       # Jarak jangkauan tangan meraba dinding (meter)
-const WAVE_SPEED: float = 8.5               # Kecepatan rambat visual (8.5 m/s, mendahului lari pemain 6.0 m/s)
-const WAVE_VISUAL_DURATION: float = 2.0     # Durasi ekspansi visual terbaca (2.0 detik)
-const MAX_WAVE_RADIUS: float = 17.0         # Jangkauan maksimal rambat gelombang (meter)
-const DOUBLE_PING_DELAY: float = 0.28       # Jeda pemutaran audio echo kedua (detik)
+@export_group("Echolocation Dynamics")
+@export var wall_tap_max_radius: float = 16.0  # Radius besar saat mengetuk dinding (< 1.5m)
+@export var floor_tap_max_radius: float = 4.5  # Radius saat di ruang terbuka (fallback lantai)
+@export var wall_reach_distance: float = 1.5   # Jarak maksimal tangan ke dinding
+@export var wave_speed: float = 11.5          # 11.5 m/s (~2x sprint 5.8 m/s, terbaca jelas oleh mata)
+@export var tap_cooldown: float = 3.0          # Cooldown antar ketukan
+@export var secondary_audio_delay: float = 0.14
+
+# ==============================================================================
+# PENGATURAN INTERAKSI
+# ==============================================================================
+@export_group("Interaction")
+@export var interact_distance: float = 2.5
 
 # ==============================================================================
 # AUDIO ASSETS & NODES
@@ -89,10 +89,7 @@ const DOUBLE_PING_DELAY: float = 0.28       # Jeda pemutaran audio echo kedua (d
 @onready var landing_player: AudioStreamPlayer3D = get_node_or_null("LandingPlayer")
 @onready var flashlight_player: AudioStreamPlayer = get_node_or_null("FlashlightPlayer")
 @onready var tap_echo_player: AudioStreamPlayer3D = get_node_or_null("TapEchoPlayer")
-@onready var outline_pass: MeshInstance3D = get_node_or_null("Head/Camera3D/OutlinePass")
 @onready var view_model: CanvasLayer = get_node_or_null("ViewModel")
-
-var outline_material: ShaderMaterial
 
 # Locomotion & State
 var is_sprinting: bool = false
@@ -104,8 +101,10 @@ var is_flashlight_on: bool = false
 var is_overheated: bool = false
 var current_heat: float = 0.0
 var overheat_timer: float = 0.0
+var cooling_delay_timer: float = 0.0
 var flicker_timer: float = 0.0
-var is_flicker_dark: bool = false
+var initial_light_energy: float = 8.0
+var initial_spot_angle: float = 45.0
 var mouse_input_accumulator: Vector2 = Vector2.ZERO
 var sway_target: Vector3 = Vector3.ZERO
 
@@ -123,12 +122,14 @@ var is_step_triggered: bool = false
 
 # Echolocation Wave State
 var is_wave_active: bool = false
-var wave_visual_timer: float = 0.0
-var current_tap_radius: float = 0.0
+var wave_radius: float = 0.0
+var tap_cooldown_timer: float = 0.0
+var active_max_radius: float = 16.0
 
 # Signals
 signal flashlight_exploded(player_position: Vector3)
 signal footstep_stepped(is_sprint: bool)
+signal interaction_failed_in_dark() # Untuk memicu teks UI / suara gumaman bingung
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -136,6 +137,8 @@ func _ready() -> void:
 	initial_camera_pos = camera.position
 	base_fov = camera.fov
 	was_on_floor = is_on_floor()
+	initial_light_energy = flashlight.light_energy
+	initial_spot_angle = flashlight.spot_angle
 
 	# Pastikan gelombang shader mati saat mulai
 	RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
@@ -145,15 +148,6 @@ func _ready() -> void:
 
 	if view_model and view_model.has_method("update_flashlight_visual"):
 		view_model.update_flashlight_visual(false)
-	if outline_pass:
-		outline_pass.visible = true
-		outline_material = outline_pass.get_active_material(0) as ShaderMaterial
-		if outline_material:
-			outline_material.set_shader_parameter("flashlight_view_pos", flashlight.position)
-			outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
-			outline_material.set_shader_parameter("flashlight_cos_angle", cos(deg_to_rad(flashlight.spot_angle)))
-			outline_material.set_shader_parameter("flashlight_range", flashlight.spot_range)
-			outline_material.set_shader_parameter("flashlight_on", false)
 
 func _init_audio_fallbacks() -> void:
 	if footstep_sounds.is_empty():
@@ -174,10 +168,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	# 2. Re-capture mouse saat kursor bebas (MOUSE_MODE_VISIBLE)
-	if Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
+	if DisplayServer.get_name() != "headless" and Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-			get_viewport().set_input_as_handled()
+			var vp := get_viewport()
+			if vp:
+				vp.set_input_as_handled()
 		return
 
 	# 3. Mouse Look & Angular Sway Accumulation
@@ -192,29 +188,46 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Akumulasikan input mouse untuk perhitungan sway
 		mouse_input_accumulator.x += mouse_x
 		mouse_input_accumulator.y += mouse_y
-		
-	# 4. Toggle Flashlight
-	if event.is_action_pressed("toggle_flashlight") and not is_overheated:
-		is_flashlight_on = !is_flashlight_on
-		flashlight.visible = is_flashlight_on
-		flashlight.light_energy = 1.0
-		flicker_timer = 0.0
-		is_flicker_dark = false
 
-		# Mainkan suara switch senter
-		if flashlight_player:
-			flashlight_player.pitch_scale = randf_range(0.95, 1.05)
-			if switch_sound:
-				flashlight_player.stream = switch_sound
-			if flashlight_player.stream:
-				flashlight_player.play()
+	# 4. Toggle Senter dengan Ignition Heat Spike (Anti-Feathering)
+	if event.is_action_pressed("toggle_flashlight"):
+		if is_overheated:
+			print("Heat: ", snapped(current_heat, 0.1), " | Overheated: ", is_overheated, " (Senter overheat! Menunggu pendinginan...)")
+			return
+
+		is_flashlight_on = not is_flashlight_on
+		flashlight.visible = is_flashlight_on
+
+		if switch_sound and flashlight_player:
+			flashlight_player.stream = switch_sound
+			flashlight_player.pitch_scale = randf_range(0.96, 1.04)
+			flashlight_player.play()
+
+		if flashlight.visible:
+			# Penalti lonjakan panas instan saat saklar dinyalakan (+15.0)
+			current_heat += IGNITION_HEAT_SPIKE
+			cooling_delay_timer = COOLING_DELAY
+			flicker_timer = 0.0
+			if current_heat >= MAX_HEAT:
+				trigger_overheat()
+		else:
+			# Tahan panas selama COOLING_DELAY sebelum mulai dingin
+			cooling_delay_timer = COOLING_DELAY
+			flashlight.light_energy = initial_light_energy
+			flashlight.spot_angle = initial_spot_angle
+
+		print("Heat: ", snapped(current_heat, 0.1), " | Overheated: ", is_overheated)
 
 		if view_model and view_model.has_method("update_flashlight_visual"):
-			view_model.update_flashlight_visual(is_flashlight_on)
-		
-	# 5. Wall-Tap / Floor-Tap Echolocation
-	if event.is_action_pressed("wall_tap") and not is_flashlight_on and not is_wave_active:
+			view_model.update_flashlight_visual(flashlight.visible and not is_overheated)
+
+	# 5. Trigger Echolocation (Dibatasi Cooldown & Tidak saat senter nyala)
+	if event.is_action_pressed("wall_tap") and not is_flashlight_on and not is_wave_active and tap_cooldown_timer <= 0.0:
 		trigger_surface_tap()
+
+	# 6. Interaksi Objek (Wajib Senter Menyala)
+	if event.is_action_pressed("interact"):
+		try_interact()
 
 func _physics_process(delta: float) -> void:
 	# Gravitasi
@@ -224,10 +237,10 @@ func _physics_process(delta: float) -> void:
 	# Arah input locomotion
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
-	
+
 	is_sprinting = Input.is_action_pressed("sprint") and direction.length() > 0.1
 	var current_speed: float = SPRINT_SPEED if is_sprinting else WALK_SPEED
-	
+
 	# Reduksi kontrol udara (AIR_CONTROL_FACTOR = 0.25)
 	var accel: float = ACCELERATION if is_on_floor() else (ACCELERATION * AIR_CONTROL_FACTOR)
 	var decel: float = DECELERATION if is_on_floor() else (DECELERATION * AIR_CONTROL_FACTOR * 0.25)
@@ -257,9 +270,6 @@ func _physics_process(delta: float) -> void:
 	update_flashlight_sway(delta)
 	handle_flashlight_heat(delta)
 	handle_tap_wave(delta)
-	if outline_material:
-		outline_material.set_shader_parameter("flashlight_on", flashlight.visible and flashlight.light_energy > 0.0)
-		outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
 
 # ==============================================================================
 # KAMERA & IMERSI FISIK
@@ -283,10 +293,8 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 	# 4. Asymmetric Head Bobbing & Idle Breathing
 	var bob_offset: Vector3 = Vector3.ZERO
 	var breath_offset: Vector3 = Vector3.ZERO
-	var is_moving: bool = is_on_floor() and horizontal_speed > 0.1
-	var is_idle: bool = is_on_floor() and not is_moving
 
-	if is_moving:
+	if is_on_floor() and horizontal_speed > 0.1:
 		var freq: float = BOB_FREQUENCY_SPRINT if is_sprinting else BOB_FREQUENCY_WALK
 		var amp: float = BOB_AMPLITUDE_SPRINT if is_sprinting else BOB_AMPLITUDE_WALK
 		bob_time += freq * delta
@@ -316,9 +324,6 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 		breath_time += 2.0 * PI * BREATH_FREQUENCY * delta
 		breath_offset.y = sin(breath_time) * BREATH_AMPLITUDE_Y
 		breath_offset.x = cos(breath_time * 0.5) * BREATH_AMPLITUDE_X
-
-	if view_model and view_model.has_method("set_idle"):
-		view_model.set_idle(is_idle)
 
 	# Komposisi posisi kamera final
 	camera.position = initial_camera_pos + bob_offset + breath_offset + Vector3(0.0, landing_compression_y, 0.0)
@@ -366,12 +371,11 @@ func update_flashlight_sway(delta: float) -> void:
 	# Interpolasi rotasi Spotlight3D mengikuti inersia gerakan pandangan
 	flashlight.rotation = flashlight.rotation.lerp(sway_target, SWAY_SMOOTH_SPEED * delta)
 
-# Alias fungsi untuk kompatibilitas
 func handle_flashlight_sway(delta: float) -> void:
 	update_flashlight_sway(delta)
 
 # ==============================================================================
-# SENTER HEAT & WARNING FLICKER
+# TERMODINAMIKA SENTER & OVERHEAT (ANTI-FEATHERING)
 # ==============================================================================
 func handle_flashlight_heat(delta: float) -> void:
 	if is_overheated:
@@ -379,155 +383,175 @@ func handle_flashlight_heat(delta: float) -> void:
 		if overheat_timer <= 0.0:
 			is_overheated = false
 			current_heat = 0.0
+			print("Senter pulih dari overheat! Siap digunakan kembali.")
 			if view_model and view_model.has_method("play_overheat_warning"):
 				view_model.play_overheat_warning(false)
 		return
 
-	if is_flashlight_on:
-		current_heat += HEAT_RATE * delta
-		
-		# 1. Critical Warning (heat >= CRITICAL_HEAT): Flicker intens & tidak teratur
-		if current_heat >= CRITICAL_HEAT:
-			flicker_timer -= delta
-			if flicker_timer <= 0.0:
-				if is_flicker_dark:
-					is_flicker_dark = false
-					flashlight.visible = true
-					flashlight.light_energy = 1.0
-					flicker_timer = randf_range(CRITICAL_LIGHT_TIME_MIN, CRITICAL_LIGHT_TIME_MAX)
-					if view_model and view_model.has_method("update_flashlight_visual"):
-						view_model.update_flashlight_visual(true)
-				else:
-					is_flicker_dark = true
-					flashlight.visible = false
-					flashlight.light_energy = 0.0
-					flicker_timer = randf_range(CRITICAL_DROP_TIME_MIN, CRITICAL_DROP_TIME_MAX)
-					if view_model and view_model.has_method("update_flashlight_visual"):
-						view_model.update_flashlight_visual(false)
-
-		# 2. Heat Warning (heat >= WARNING_HEAT): Interval noise halus (~0.12s) pencegah strobe hazard
-		elif current_heat >= WARNING_HEAT:
-			flicker_timer -= delta
-			if flicker_timer <= 0.0:
-				flicker_timer = randf_range(WARNING_INTERVAL_MIN, WARNING_INTERVAL_MAX)
-				if is_flicker_dark:
-					is_flicker_dark = false
-					flashlight.visible = true
-					flashlight.light_energy = 1.0
-					if view_model and view_model.has_method("update_flashlight_visual"):
-						view_model.update_flashlight_visual(true)
-				else:
-					# 25% peluang drop singkat pada interval ini, tidak terus-menerus on-off
-					if randf() < 0.25:
-						is_flicker_dark = true
-						flashlight.visible = false
-						flashlight.light_energy = 0.0
-						flicker_timer = 0.05
-						if view_model and view_model.has_method("update_flashlight_visual"):
-							view_model.update_flashlight_visual(false)
-
-		# 3. Normal (heat < WARNING_HEAT): Stabil menyala dan tidak berkedip
-		else:
-			is_flicker_dark = false
-			flashlight.visible = true
-			flashlight.light_energy = 1.0
-			flicker_timer = 0.0
-			if view_model and view_model.has_method("update_flashlight_visual"):
-				view_model.update_flashlight_visual(true)
-			
-		# 4. Overheated (heat >= MAX_HEAT): Padam total dan masuk cooldown
+	if flashlight.visible:
+		cooling_delay_timer = COOLING_DELAY
+		current_heat = min(current_heat + HEAT_RATE * delta, MAX_HEAT)
 		if current_heat >= MAX_HEAT:
-			is_overheated = true
-			is_flashlight_on = false
-			flashlight.visible = false
-			flashlight.light_energy = 1.0
-			is_flicker_dark = false
-			flicker_timer = 0.0
-			overheat_timer = OVERHEAT_COOLDOWN
-			if view_model and view_model.has_method("play_overheat_warning"):
-				view_model.play_overheat_warning(true)
-			emit_signal("flashlight_exploded", global_position)
+			trigger_overheat()
+			return
+
+		if current_heat >= WARNING_HEAT:
+			flicker_timer += delta
+			if flicker_timer >= FLICKER_INTERVAL:
+				flicker_timer = 0.0
+				# Kedip mati-nyala biner nyata: 0.0 (mati sesaat) vs initial_light_energy (menyala)
+				var is_flicker_dark := randf() < 0.42
+				flashlight.light_energy = 0.0 if is_flicker_dark else initial_light_energy
+				# Goyangkan sedikit spot_angle agar kedipan terlihat jelas di shader noir
+				flashlight.spot_angle = clampf(initial_spot_angle + randf_range(-3.5, 3.5), 25.0, 60.0)
+		else:
+			flashlight.light_energy = initial_light_energy
+			flashlight.spot_angle = initial_spot_angle
 	else:
-		# 5. Recovery saat senter dimatikan secara manual
-		current_heat = move_toward(current_heat, 0.0, COOL_RATE * delta)
-		is_flicker_dark = false
-		flashlight.visible = false
-		flashlight.light_energy = 1.0
-		flicker_timer = 0.0
-		if view_model and view_model.has_method("update_flashlight_visual"):
-			view_model.update_flashlight_visual(false)
+		# Tahan panas selama COOLING_DELAY sebelum mulai turun
+		if cooling_delay_timer > 0.0:
+			cooling_delay_timer -= delta
+		else:
+			current_heat = max(current_heat - COOL_RATE * delta, 0.0)
+		flashlight.light_energy = initial_light_energy
+		flashlight.spot_angle = initial_spot_angle
+
+func trigger_overheat() -> void:
+	current_heat = MAX_HEAT
+	is_overheated = true
+	is_flashlight_on = false
+	flashlight.visible = false
+	flashlight.light_energy = initial_light_energy
+	flashlight.spot_angle = initial_spot_angle
+	overheat_timer = OVERHEAT_COOLDOWN
+	print("Heat: ", snapped(current_heat, 0.1), " | Overheated: ", is_overheated, " (OVERHEAT! Senter padam selama 4 detik)")
+	if view_model and view_model.has_method("play_overheat_warning"):
+		view_model.play_overheat_warning(true)
+	var emit_pos: Vector3 = global_position if is_inside_tree() else position
+	flashlight_exploded.emit(emit_pos)
 
 # ==============================================================================
-# GELOMBANG ECHOLOCATION (WALL-TAP) & AFTERGLOW TRAIL
+# SISTEM INTERAKSI OBJEK (ASIMETRI INFORMASI - WAJIB SENTER)
 # ==============================================================================
-func handle_tap_wave(delta: float) -> void:
-	if not is_wave_active:
-		return
+func try_interact() -> void:
+	var space_state := get_world_3d().direct_space_state
+	var cam_from := camera.global_position
+	var cam_to := cam_from + (-camera.global_transform.basis.z * interact_distance)
 
-	wave_visual_timer += delta
-	var progress: float = clampf(wave_visual_timer / WAVE_VISUAL_DURATION, 0.0, 1.0)
-	
-	# Ekspansi terbaca dengan kecepatan stabil (~8.5 m/s)
-	current_tap_radius = lerpf(0.0, MAX_WAVE_RADIUS, progress)
-	RenderingServer.global_shader_parameter_set("tap_radius", current_tap_radius)
+	var query := PhysicsRayQueryParameters3D.create(cam_from, cam_to)
+	query.exclude = [self.get_rid()]
+	var result := space_state.intersect_ray(query)
 
-	# Selesai merambat visual dalam 2.0 detik
-	if progress >= 1.0:
-		is_wave_active = false
-		wave_visual_timer = 0.0
-		current_tap_radius = 0.0
-		RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
+	if result and result.has("collider") and result.collider:
+		var target: Node = result.collider
+		var interact_target: Node = target
+		# Periksa collider, parent, atau owner untuk grup "interactable" atau method interact()
+		if not (interact_target.has_method("interact") or interact_target.is_in_group("interactable")):
+			if target.get_parent() and (target.get_parent().has_method("interact") or target.get_parent().is_in_group("interactable")):
+				interact_target = target.get_parent()
+			elif target.owner and (target.owner.has_method("interact") or target.owner.is_in_group("interactable")):
+				interact_target = target.owner
 
+		if interact_target.has_method("interact") or interact_target.is_in_group("interactable"):
+			# Pemain wajib menyalakan senter untuk berinteraksi
+			if flashlight.visible and not is_overheated:
+				if interact_target.has_method("interact"):
+					interact_target.interact(self)
+				else:
+					print("Berhasil berinteraksi dengan objek!")
+			else:
+				interaction_failed_in_dark.emit()
+				# Goyang kamera kecil saat gagal interaksi dalam gelap
+				landing_spring_vel -= 0.7
+				if interact_target.has_method("interact_in_dark"):
+					interact_target.interact_in_dark(self)
+				else:
+					print("Gelap gulita! Nyalakan senter untuk berinteraksi.")
+
+# ==============================================================================
+# GELOMBANG ECHOLOCATION (WALL TAP VS FLOOR FALLBACK & COOLDOWN)
+# ==============================================================================
 func trigger_surface_tap() -> void:
-	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
-	var origin: Vector3 = camera.global_position
-	
-	# Daftar arah cek: 1. Depan, 2. Kanan, 3. Kiri, 4. Lantai di bawah kaki
-	var check_directions: Array[Vector3] = [
-		-camera.global_transform.basis.z * TAP_REACH_DISTANCE,
-		camera.global_transform.basis.x * TAP_REACH_DISTANCE,
-		-camera.global_transform.basis.x * TAP_REACH_DISTANCE,
-		Vector3(0.0, -2.5, 0.0)
+	var space_state := get_world_3d().direct_space_state
+	# Cek arah pandangan kamera serta arah horizontal (Depan, Kiri, Kanan) dalam jangkauan tangan (1.5m)
+	var wall_directions := [
+		-camera.global_transform.basis.z,
+		-global_transform.basis.z,
+		-global_transform.basis.x,
+		global_transform.basis.x
 	]
-	
-	var closest_hit_pos: Vector3 = global_position - Vector3(0.0, 0.9, 0.0)
-	var min_dist: float = 999.0
-	
-	for dir in check_directions:
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir)
+
+	var closest_hit_pos: Vector3 = Vector3.ZERO
+	var min_distance: float = 999.0
+	var hit_wall: bool = false
+
+	for dir in wall_directions:
+		var ray_origin := head.global_position - Vector3(0.0, 0.25, 0.0) # Setinggi dada/tangan
+		var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_origin + dir * wall_reach_distance)
 		query.exclude = [self.get_rid()]
-		var result: Dictionary = space_state.intersect_ray(query)
+		var result := space_state.intersect_ray(query)
+
 		if result:
-			var dist: float = origin.distance_to(result.position)
-			if dist < min_dist:
-				min_dist = dist
+			var dist: float = ray_origin.distance_to(result.position)
+			if dist < min_distance:
+				min_distance = dist
 				closest_hit_pos = result.position
-	
-	# Mulai ekspansi gelombang shader
-	RenderingServer.global_shader_parameter_set("tap_origin", closest_hit_pos)
-	RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
-	wave_visual_timer = 0.0
-	current_tap_radius = 0.0
-	is_wave_active = true
+				hit_wall = true
 
-	# 1. Putar audio TapEchoPlayer ping pertama di titik kontak permukaan (origin)
-	if tap_echo_player:
-		tap_echo_player.global_position = closest_hit_pos
-		if echo_sound:
-			tap_echo_player.stream = echo_sound
-		if tap_echo_player.stream:
-			tap_echo_player.pitch_scale = 1.0
-			tap_echo_player.play()
+	var origin: Vector3
+	if hit_wall:
+		# KONDISI A: Tangan mengetuk tembok/pilar -> Sonar Kuat (16m)
+		origin = closest_hit_pos
+		active_max_radius = wall_tap_max_radius
+	else:
+		# KONDISI B: Ruang terbuka -> Hentakan kaki lemah di lantai (4.5m)
+		origin = global_position - Vector3(0.0, 0.9, 0.0)
+		active_max_radius = floor_tap_max_radius
 
-	# 2. Double Audio Ping: Picu gema kedua seirama dengan cincin kedua (~0.28s)
-	get_tree().create_timer(DOUBLE_PING_DELAY).timeout.connect(func():
-		if is_instance_valid(tap_echo_player) and tap_echo_player.stream:
-			tap_echo_player.pitch_scale = randf_range(0.96, 1.04)
-			tap_echo_player.play()
-	)
+	if echo_sound and tap_echo_player:
+		tap_echo_player.global_position = origin
+		tap_echo_player.pitch_scale = randf_range(0.98, 1.04) if hit_wall else randf_range(0.75, 0.85)
+		tap_echo_player.volume_db = 0.0 if hit_wall else -6.0
+		tap_echo_player.stream = echo_sound
+		tap_echo_player.play()
 
-	# 3. Recoil visual pada tangan (ViewModel)
+		# Double ping hanya aktif jika mengetuk dinding/pilar
+		if hit_wall:
+			get_tree().create_timer(secondary_audio_delay).timeout.connect(func():
+				if is_instance_valid(tap_echo_player) and echo_sound:
+					var p2 := AudioStreamPlayer3D.new()
+					p2.bus = tap_echo_player.bus
+					p2.max_distance = tap_echo_player.max_distance
+					p2.stream = echo_sound
+					p2.pitch_scale = randf_range(1.08, 1.15)
+					p2.volume_db = tap_echo_player.volume_db - 3.0
+					get_tree().current_scene.add_child(p2)
+					p2.global_position = origin
+					p2.play()
+					p2.finished.connect(p2.queue_free)
+			)
+
+	# Recoil visual pada tangan (ViewModel)
 	if view_model and view_model.has_method("play_tap_recoil"):
 		view_model.play_tap_recoil()
 
-	print("Tap! Echolocation double-wave aktif dari: ", closest_hit_pos, " | Kecepatan: ", WAVE_SPEED, " m/s | Durasi: ", WAVE_VISUAL_DURATION, "s")
+	RenderingServer.global_shader_parameter_set("tap_origin", origin)
+	is_wave_active = true
+	wave_radius = 0.0
+	tap_cooldown_timer = tap_cooldown
+	print("Tap! ", "Dinding (16m)" if hit_wall else "Lantai (4.5m)", " dari: ", origin)
+
+func handle_tap_wave(delta: float) -> void:
+	if tap_cooldown_timer > 0.0:
+		tap_cooldown_timer -= delta
+
+	if not is_wave_active:
+		return
+
+	wave_radius += wave_speed * delta
+	RenderingServer.global_shader_parameter_set("tap_radius", wave_radius)
+
+	if wave_radius >= (active_max_radius + 2.0):
+		is_wave_active = false
+		wave_radius = 0.0
+		RenderingServer.global_shader_parameter_set("tap_radius", 0.0)

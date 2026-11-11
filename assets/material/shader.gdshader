@@ -13,8 +13,8 @@ uniform float hatch_scale : hint_range(0.1, 3.0) = 0.75;
 
 // --- PENGATURAN GELOMBANG GANDA (DOUBLE-RIPPLE DENGAN AFTERGLOW TRAIL) ---
 const float MAX_TAP_DISTANCE = 18.0;
-const float WAVE_GAP = 2.6;          // Jarak jeda antara cincin primer dan sekunder (meter)
-const float TRAIL_LENGTH = 3.2;      // Panjang ekor pendaran afterglow agar terbaca jelas oleh pemain
+const float WAVE_GAP = 3.5;          // Jarak jeda antara cincin primer dan sekunder (3.5m)
+const float WAVE_THICKNESS = 3.5;    // Ketebalan pendaran gelombang (smooth trail) agar garis ruangan terbaca jelas
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -58,13 +58,13 @@ float get_wave_intensity(float dist, float front_radius, float trail_len) {
 		return 0.0;
 	}
 	float delta = front_radius - dist;
-	// Di depan kepala gelombang (soft leading edge 0.3m)
+	// Di depan kepala gelombang (soft leading edge 0.35m)
 	if (delta < 0.0) {
-		return smoothstep(-0.3, 0.0, delta);
+		return smoothstep(-0.35, 0.0, delta);
 	}
 	// Di belakang kepala gelombang (pendaran memudar di sepanjang trail_len)
 	if (delta <= trail_len) {
-		return pow(1.0 - (delta / trail_len), 1.3);
+		return pow(1.0 - (delta / trail_len), 1.2);
 	}
 	return 0.0;
 }
@@ -80,25 +80,25 @@ void fragment() {
 
 	// --- EFEK GELOMBANG GANDA (DOUBLE-RIPPLE ECHOLOCATION DENGAN AFTERGLOW) ---
 	EMISSION = vec3(0.0);
-	if (tap_radius > 0.05 && tap_radius < MAX_TAP_DISTANCE) {
+	if (tap_radius > 0.05 && tap_radius < (MAX_TAP_DISTANCE + 2.0)) {
 		float dist = distance(world_pos, tap_origin);
 
-		// 1. Cincin Primer (depan) pada radius tap_radius dengan ekor afterglow
-		float ring1 = get_wave_intensity(dist, tap_radius, TRAIL_LENGTH);
+		// 1. Cincin Primer (depan) pada radius tap_radius dengan ekor afterglow tebal (3.5m)
+		float ring1 = get_wave_intensity(dist, tap_radius, WAVE_THICKNESS);
 
-		// 2. Cincin Sekunder (belakang) mengekor di (tap_radius - WAVE_GAP)
+		// 2. Cincin Sekunder (belakang) mengekor di (tap_radius - 3.5m)
 		// Hanya muncul jika tap_radius > WAVE_GAP untuk mencegah anomali di titik awal
 		float ring2 = 0.0;
 		if (tap_radius > WAVE_GAP) {
 			float r2 = tap_radius - WAVE_GAP;
-			ring2 = get_wave_intensity(dist, r2, TRAIL_LENGTH) * 0.85;
+			ring2 = get_wave_intensity(dist, r2, WAVE_THICKNESS) * 0.85;
 		}
 
 		// 3. Gabungkan intensitas kedua cincin (clamp 0.0 - 1.0)
 		float combined_wave = clamp(ring1 + ring2, 0.0, 1.0);
 
-		// Fade out halus saat mendekati batas maksimal jangkauan
-		float distance_fade = 1.0 - smoothstep(MAX_TAP_DISTANCE * 0.75, MAX_TAP_DISTANCE, tap_radius);
+		// 4. Redupkan intensitas ripple secara bertahap saat tap_radius mendekati akhir agar tidak hilang secara kasar
+		float distance_fade = 1.0 - smoothstep(MAX_TAP_DISTANCE * 0.70, MAX_TAP_DISTANCE, tap_radius);
 		float wave_intensity = combined_wave * distance_fade;
 
 		if (wave_intensity > 0.005) {
