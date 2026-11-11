@@ -22,8 +22,8 @@ const BOB_RESET_SPEED: float = 10.0
 
 # 2. Idle Breathing
 const BREATH_FREQUENCY: float = 0.35 # Frekuensi pernapasan 0.35 Hz
-const BREATH_AMPLITUDE_Y: float = 0.006
-const BREATH_AMPLITUDE_X: float = 0.003
+const BREATH_AMPLITUDE_Y: float = 0.01
+const BREATH_AMPLITUDE_X: float = 0.005
 
 # 3. Dynamic Sprint FOV
 const SPRINT_FOV: float = 80.0
@@ -39,7 +39,7 @@ const SPRING_DAMPING: float = 15.0
 
 # 6. Flashlight Angular Inertia (Sway / Lag)
 const SWAY_AMOUNT: float = 0.0015
-const SWAY_MAX: float = 0.12 # Batas maksimal rotasi lag (~6.8 derajat)
+const SWAY_MAX: float = 0.15 # Batas maksimal rotasi lag (~8.6 derajat, clampf -0.15 sampai 0.15)
 const SWAY_RETURN_SPEED: float = 7.0
 const SWAY_SMOOTH_SPEED: float = 11.0
 
@@ -103,6 +103,7 @@ var current_heat: float = 0.0
 var overheat_timer: float = 0.0
 var flicker_timer: float = 0.0
 var is_flicker_dark: bool = false
+var mouse_input_accumulator: Vector2 = Vector2.ZERO
 var sway_target: Vector3 = Vector3.ZERO
 
 # Camera & Immersion Dynamic Variables
@@ -176,9 +177,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		head.rotate_x(-mouse_y * MOUSE_SENSITIVITY)
 		head.rotation.x = clamp(head.rotation.x, deg_to_rad(-80), deg_to_rad(80))
 
-		# Flashlight Angular Inertia (sway lag terarah)
-		sway_target.y = clamp(sway_target.y - mouse_x * SWAY_AMOUNT, -SWAY_MAX, SWAY_MAX)
-		sway_target.x = clamp(sway_target.x + mouse_y * SWAY_AMOUNT, -SWAY_MAX, SWAY_MAX)
+		# Akumulasikan input mouse untuk perhitungan sway
+		mouse_input_accumulator.x += mouse_x
+		mouse_input_accumulator.y += mouse_y
 		
 	# 4. Toggle Flashlight
 	if event.is_action_pressed("toggle_flashlight") and not is_overheated:
@@ -241,7 +242,7 @@ func _physics_process(delta: float) -> void:
 
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
 	handle_camera_immersion(delta, input_dir, horizontal_speed)
-	handle_flashlight_sway(delta)
+	update_flashlight_sway(delta)
 	handle_flashlight_heat(delta)
 	handle_tap_wave(delta)
 
@@ -323,11 +324,31 @@ func _trigger_landing(impact_vel: float) -> void:
 		if landing_player.stream:
 			landing_player.play()
 
-func handle_flashlight_sway(delta: float) -> void:
-	# Pemulihan target sway ke titik tengah
+func update_flashlight_sway(delta: float) -> void:
+	# Hitung target sway bertanda positif terhadap mouse_input_accumulator:
+	# - Mouse ke Kanan (+x) -> target_sway_y > 0 (rotasi Y positif di Godot = hadap Kiri / tertinggal)
+	# - Mouse ke Kiri  (-x) -> target_sway_y < 0 (rotasi Y negatif di Godot = hadap Kanan / tertinggal)
+	# - Mouse ke Atas  (-y) -> target_sway_x < 0 (rotasi X negatif di Godot = hadap Bawah / tertinggal)
+	# - Mouse ke Bawah (+y) -> target_sway_x > 0 (rotasi X positif di Godot = hadap Atas / tertinggal)
+	var target_sway_y: float = clampf(mouse_input_accumulator.x * SWAY_AMOUNT, -SWAY_MAX, SWAY_MAX)
+	var target_sway_x: float = clampf(mouse_input_accumulator.y * SWAY_AMOUNT, -SWAY_MAX, SWAY_MAX)
+
+	# Akumulasikan ke sway_target dan batasi dengan clampf (-0.15 hingga 0.15)
+	sway_target.y = clampf(sway_target.y + target_sway_y, -SWAY_MAX, SWAY_MAX)
+	sway_target.x = clampf(sway_target.x + target_sway_x, -SWAY_MAX, SWAY_MAX)
+
+	# Reset accumulator setelah diproses
+	mouse_input_accumulator = Vector2.ZERO
+
+	# Pemulihan target sway ke titik tengah (0, 0, 0)
 	sway_target = sway_target.lerp(Vector3.ZERO, SWAY_RETURN_SPEED * delta)
+
 	# Interpolasi rotasi Spotlight3D mengikuti inersia gerakan pandangan
 	flashlight.rotation = flashlight.rotation.lerp(sway_target, SWAY_SMOOTH_SPEED * delta)
+
+# Alias fungsi untuk kompatibilitas
+func handle_flashlight_sway(delta: float) -> void:
+	update_flashlight_sway(delta)
 
 # ==============================================================================
 # SENTER HEAT & WARNING FLICKER
