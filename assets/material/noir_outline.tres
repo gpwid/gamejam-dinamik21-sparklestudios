@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://ixibojbne03y"]
+
+[ext_resource type="Shader" uid="uid://pfpxn773fir3" path="res://assets/material/noir_outline.gdshader" id="1_outline"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_outline")
+shader_parameter/outline_width = 1.0
+shader_parameter/depth_edge_threshold = 0.08
+shader_parameter/normal_edge_threshold = 0.2
+shader_parameter/flashlight_on = false
+shader_parameter/flashlight_view_pos = Vector3(0.3, -0.351, 0)
+shader_parameter/flashlight_view_dir = Vector3(0, 0, -1)
+shader_parameter/flashlight_cos_angle = 0.7071
+shader_parameter/flashlight_range = 25.0

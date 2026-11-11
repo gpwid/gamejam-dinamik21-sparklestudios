@@ -89,7 +89,10 @@ const DOUBLE_PING_DELAY: float = 0.28       # Jeda pemutaran audio echo kedua (d
 @onready var landing_player: AudioStreamPlayer3D = get_node_or_null("LandingPlayer")
 @onready var flashlight_player: AudioStreamPlayer = get_node_or_null("FlashlightPlayer")
 @onready var tap_echo_player: AudioStreamPlayer3D = get_node_or_null("TapEchoPlayer")
+@onready var outline_pass: MeshInstance3D = get_node_or_null("Head/Camera3D/OutlinePass")
 @onready var view_model: CanvasLayer = get_node_or_null("ViewModel")
+
+var outline_material: ShaderMaterial
 
 # Locomotion & State
 var is_sprinting: bool = false
@@ -142,6 +145,15 @@ func _ready() -> void:
 
 	if view_model and view_model.has_method("update_flashlight_visual"):
 		view_model.update_flashlight_visual(false)
+	if outline_pass:
+		outline_pass.visible = true
+		outline_material = outline_pass.get_active_material(0) as ShaderMaterial
+		if outline_material:
+			outline_material.set_shader_parameter("flashlight_view_pos", flashlight.position)
+			outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
+			outline_material.set_shader_parameter("flashlight_cos_angle", cos(deg_to_rad(flashlight.spot_angle)))
+			outline_material.set_shader_parameter("flashlight_range", flashlight.spot_range)
+			outline_material.set_shader_parameter("flashlight_on", false)
 
 func _init_audio_fallbacks() -> void:
 	if footstep_sounds.is_empty():
@@ -245,6 +257,9 @@ func _physics_process(delta: float) -> void:
 	update_flashlight_sway(delta)
 	handle_flashlight_heat(delta)
 	handle_tap_wave(delta)
+	if outline_material:
+		outline_material.set_shader_parameter("flashlight_on", flashlight.visible and flashlight.light_energy > 0.0)
+		outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
 
 # ==============================================================================
 # KAMERA & IMERSI FISIK
@@ -268,8 +283,10 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 	# 4. Asymmetric Head Bobbing & Idle Breathing
 	var bob_offset: Vector3 = Vector3.ZERO
 	var breath_offset: Vector3 = Vector3.ZERO
+	var is_moving: bool = is_on_floor() and horizontal_speed > 0.1
+	var is_idle: bool = is_on_floor() and not is_moving
 
-	if is_on_floor() and horizontal_speed > 0.1:
+	if is_moving:
 		var freq: float = BOB_FREQUENCY_SPRINT if is_sprinting else BOB_FREQUENCY_WALK
 		var amp: float = BOB_AMPLITUDE_SPRINT if is_sprinting else BOB_AMPLITUDE_WALK
 		bob_time += freq * delta
@@ -299,6 +316,9 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 		breath_time += 2.0 * PI * BREATH_FREQUENCY * delta
 		breath_offset.y = sin(breath_time) * BREATH_AMPLITUDE_Y
 		breath_offset.x = cos(breath_time * 0.5) * BREATH_AMPLITUDE_X
+
+	if view_model and view_model.has_method("set_idle"):
+		view_model.set_idle(is_idle)
 
 	# Komposisi posisi kamera final
 	camera.position = initial_camera_pos + bob_offset + breath_offset + Vector3(0.0, landing_compression_y, 0.0)
