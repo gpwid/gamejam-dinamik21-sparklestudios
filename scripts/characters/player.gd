@@ -671,4 +671,4 @@ func trigger_surface_tap() -> void:
 	if view_model and view_model.has_method("play_tap_recoil"):
 		view_model.play_tap_recoil()
 
-	print("Tap! ", "Dinding (17m)" if hit_wall else "Lantai (6m)", " | Kecepatan: ", wave_speed, " m/s")
+	print("Tap! ", "Objek (17m)" if hit_wall else "Lantai (6m)", " | Kecepatan: ", wave_speed, " m/s")
