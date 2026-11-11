@@ -4,6 +4,9 @@ render_mode unshaded, fog_disabled, depth_test_disabled, depth_draw_never, cull_
 uniform sampler2D screen_texture : source_color, hint_screen_texture, filter_nearest;
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable, filter_nearest;
 
+global uniform vec3 tap_origin;
+global uniform float tap_radius;
+
 uniform float outline_width : hint_range(0.5, 3.0, 0.5) = 1.0;
 uniform float depth_edge_threshold : hint_range(0.01, 0.5, 0.005) = 0.08;
 uniform float normal_edge_threshold : hint_range(0.05, 1.0, 0.05) = 0.20;
@@ -78,21 +81,42 @@ void fragment() {
 	bool is_crease = (max_lap <= depth_edge_threshold) && (crease > normal_edge_threshold) && (d_c < 18.0);
 
 	vec3 final_col = screen_col;
-	if (lum_c > 0.15) {
-		// Area terang: garis tepi siluet & sudut berwarna HITAM
-		if (pos_lap > depth_edge_threshold || is_crease) {
-			final_col = vec3(0.0);
-		}
-	} else if (flashlight_on) {
+	bool in_spot = false;
+	if (flashlight_on) {
 		vec3 to_frag = p_c - flashlight_view_pos;
 		float dist = length(to_frag);
 		float cone_dot = dot(safe_normalize(to_frag), safe_normalize(flashlight_view_dir));
-		if (dist <= flashlight_range && cone_dot >= flashlight_cos_angle) {
+		in_spot = (dist <= flashlight_range) && (cone_dot >= flashlight_cos_angle - 0.02);
+	}
+
+	if (lum_c > 0.15) {
+		// Area terang di dalam senter: garis tepi siluet & sudut berwarna HITAM (jangan hapus garis putih echolocation di luar senter)
+		if (in_spot && (pos_lap > depth_edge_threshold || is_crease)) {
+			final_col = vec3(0.0);
+		}
+	} else {
+		if (in_spot) {
 			// Area gelap di dalam kerucut senter: garis PUTIH untuk objek gelap-di-atas-gelap & sudut gelap
 			float max_neighbor_lum = max(max(get_lum(uv_l), get_lum(uv_r)), max(get_lum(uv_u), get_lum(uv_d)));
 			bool dark_over_dark = (max_neighbor_lum <= 0.15) && (neg_lap > depth_edge_threshold);
 			if (dark_over_dark || is_crease) {
 				final_col = vec3(1.0);
+			}
+		}
+
+		// Garis siluet & sudut putih saat echolocation aktif (termasuk sisi luar kotak/meja)
+		if (abs(tap_radius) > 0.05 && d_c < 50.0) {
+			vec3 world_pos = (INV_VIEW_MATRIX * vec4(p_c, 1.0)).xyz;
+			float tap_dist = distance(world_pos, tap_origin);
+			bool is_expanding = (tap_radius > 0.0);
+			float current_r = is_expanding ? tap_radius : floor(abs(tap_radius));
+			float global_fade = is_expanding ? 1.0 : fract(abs(tap_radius));
+
+			if (tap_dist <= current_r + 0.25) {
+				float revealed_area = 1.0 - smoothstep(current_r - 0.4, current_r + 0.2, tap_dist);
+				if (neg_lap > depth_edge_threshold || is_crease) {
+					final_col = max(final_col, vec3(revealed_area * global_fade));
+				}
 			}
 		}
 	}
