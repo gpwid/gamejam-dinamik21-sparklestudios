@@ -78,33 +78,31 @@ void fragment() {
 	}
 	ALBEDO = vec3(ink);
 
-	// --- EFEK GELOMBANG GANDA (DOUBLE-RIPPLE ECHOLOCATION DENGAN AFTERGLOW) ---
+	// --- ECHOLOCATION: OUTLINE-ONLY (GARIS PUTIH DI ATAS LATAR HITAM) ---
 	EMISSION = vec3(0.0);
-	if (tap_radius > 0.05 && tap_radius < (MAX_TAP_DISTANCE + 2.0)) {
+	if (abs(tap_radius) > 0.05) {
 		float dist = distance(world_pos, tap_origin);
+		bool is_expanding = (tap_radius > 0.0);
+		float current_r = is_expanding ? tap_radius : floor(abs(tap_radius));
+		float global_fade = is_expanding ? 1.0 : fract(abs(tap_radius));
 
-		// 1. Cincin Primer (depan) pada radius tap_radius dengan ekor afterglow tebal (3.5m)
-		float ring1 = get_wave_intensity(dist, tap_radius, WAVE_THICKNESS);
+		if (dist <= current_r + 0.25) {
+			// Area yang sudah tersapu gelombang
+			float revealed_area = 1.0 - smoothstep(current_r - 0.4, current_r + 0.2, dist);
 
-		// 2. Cincin Sekunder (belakang) mengekor di (tap_radius - 3.5m)
-		// Hanya muncul jika tap_radius > WAVE_GAP untuk mencegah anomali di titik awal
-		float ring2 = 0.0;
-		if (tap_radius > WAVE_GAP) {
-			float r2 = tap_radius - WAVE_GAP;
-			ring2 = get_wave_intensity(dist, r2, WAVE_THICKNESS) * 0.85;
-		}
+			// Garis tipis kepala gelombang primer & sekunder saat merambat
+			float ring_front = 0.0;
+			if (is_expanding) {
+				float ring1_line = smoothstep(0.25, 0.0, abs(dist - current_r));
+				float ring2_line = (current_r > WAVE_GAP) ? smoothstep(0.2, 0.0, abs(dist - (current_r - WAVE_GAP))) * 0.8 : 0.0;
+				ring_front = clamp(ring1_line + ring2_line, 0.0, 1.0);
+			}
 
-		// 3. Gabungkan intensitas kedua cincin (clamp 0.0 - 1.0)
-		float combined_wave = clamp(ring1 + ring2, 0.0, 1.0);
+			// HANYA nyalakan garis outline (comic_edge) dan garis cincin perambat
+			float outline_only = step(0.5, comic_edge);
+			float final_sonar = clamp(outline_only * revealed_area + ring_front, 0.0, 1.0) * global_fade;
 
-		// 4. Redupkan intensitas ripple secara bertahap saat tap_radius mendekati akhir agar tidak hilang secara kasar
-		float distance_fade = 1.0 - smoothstep(MAX_TAP_DISTANCE * 0.70, MAX_TAP_DISTANCE, tap_radius);
-		float wave_intensity = combined_wave * distance_fade;
-
-		if (wave_intensity > 0.005) {
-			// Pertahankan gaya comic ink: garis siluet, sudut tajam, dan grid ubin tetap hitam
-			float wave_ink = (comic_edge > 0.5) ? 0.0 : 1.0;
-			EMISSION = vec3(wave_ink * wave_intensity);
+			EMISSION = vec3(final_sonar);
 		}
 	}
 }
