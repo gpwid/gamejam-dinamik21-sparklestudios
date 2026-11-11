@@ -4,7 +4,6 @@
 [ext_resource type="PackedScene" uid="uid://b83uw3cacuhso" path="res://scenes/characters/player.tscn" id="2_sspuo"]
 [ext_resource type="Material" uid="uid://bemel6bqisshu" path="res://assets/material/noirtoon_shader.tres" id="3_q1j05"]
 [ext_resource type="PackedScene" uid="uid://2jid1n3xi8b4" path="res://assets/3d/table.glb" id="4_sspuo"]
-[ext_resource type="Script" path="res://scripts/core/test_interactable.gd" id="5_interact"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_eno46"]
 render_priority = 0
@@ -57,9 +56,6 @@ size = Vector3(1, 1.2561035, 0.9803467)
 [sub_resource type="BoxShape3D" id="BoxShape3D_au0yo"]
 size = Vector3(1, 1.2561035, 0.9803467)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_table"]
-size = Vector3(8, 4, 5)
-
 [node name="TestWorld" type="Node3D" unique_id=319136204]
 
 [node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=1141823545]
@@ -109,22 +105,15 @@ surface_material_override/0 = SubResource("ShaderMaterial_6oue3")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D3/StaticBody3D" unique_id=850418220]
 shape = SubResource("BoxShape3D_pkxlf")
 
-[node name="MeshInstance3D4" type="MeshInstance3D" parent="." groups=["interactable"] unique_id=1608972418]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, -2.2)
+[node name="MeshInstance3D4" type="MeshInstance3D" parent="." unique_id=1608972418]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.679356, 0.12805176, 2.7437305)
 mesh = SubResource("BoxMesh_au0yo")
 surface_material_override/0 = SubResource("ShaderMaterial_6oue3")
-script = ExtResource("5_interact")
 
-[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D4" groups=["interactable"] unique_id=249616658]
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D4" unique_id=249616658]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D4/StaticBody3D" unique_id=590681103]
 shape = SubResource("BoxShape3D_au0yo")
 
 [node name="table" parent="." unique_id=1493196024 instance=ExtResource("4_sspuo")]
 transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0.8853972, -0.1212945, -3.1684766)
-
-[node name="StaticBody3D" type="StaticBody3D" parent="table" unique_id=1849182910]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="table/StaticBody3D" unique_id=1849182911]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
-shape = SubResource("BoxShape3D_table")
