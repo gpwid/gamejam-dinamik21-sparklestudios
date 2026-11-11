@@ -69,14 +69,16 @@ const CRITICAL_DROP_TIME_MIN: float = 0.04
 const CRITICAL_DROP_TIME_MAX: float = 0.09
 
 # ==============================================================================
-# PENGATURAN GELOMBANG ECHOLOCATION (DOUBLE-WAVE & BALANCING)
+# PENGATURAN GELOMBANG ECHOLOCATION (PERSISTENT REVEAL & SIMULTANEOUS FADE)
 # ==============================================================================
 @export_group("Echolocation Dynamics")
 @export var wall_reach_distance: float = 1.8   # Jarak tangan menyentuh dinding (meter)
 @export var wall_tap_max_radius: float = 17.0  # Jangkauan maksimal saat mengetuk dinding
 @export var floor_tap_max_radius: float = 6.0  # Jangkauan terbatas saat di ruang terbuka
-@export var wave_speed: float = 12.0           # 12.0 m/s (2x lari sprint 6.0 m/s, tetap terbaca jelas)
-@export var tap_cooldown: float = 3.0          # Cooldown antar ketukan (detik)
+@export var wave_speed: float = 16.0           # 16.0 m/s (Cepat & ekspansif)
+@export var wave_hold_duration: float = 0.35   # Tahan visibilitas penuh (detik)
+@export var wave_fade_duration: float = 1.2    # Fade-out serentak seluruh ruangan (detik)
+@export var tap_cooldown: float = 1.5          # Cooldown jeda gelap setelah fade selesai (detik)
 @export var double_ping_delay: float = 0.22    # Jeda pemutaran audio echo kedua (detik)
 
 # ==============================================================================
@@ -136,8 +138,12 @@ var landing_compression_y: float = 0.0
 var is_step_triggered: bool = false
 
 # Echolocation Wave State
+enum WavePhase { IDLE, EXPAND, HOLD, FADE }
+var wave_phase: WavePhase = WavePhase.IDLE
+var wave_timer: float = 0.0
 var is_wave_active: bool = false
 var current_tap_radius: float = 0.0
+var shader_tap_radius: float = 0.0
 var active_max_radius: float = 17.0
 var tap_cooldown_timer: float = 0.0
 
@@ -154,7 +160,7 @@ func _ready() -> void:
 	base_fov = camera.fov
 	was_on_floor = is_on_floor()
 
-	RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
+	_set_tap_radius(0.0)
 	_init_audio_fallbacks()
 
 	if view_model and view_model.has_method("update_flashlight_visual"):
@@ -551,6 +557,10 @@ func try_interact() -> void:
 # ==============================================================================
 # GELOMBANG ECHOLOCATION (WALL-TAP VS FLOOR FALLBACK & COOLDOWN)
 # ==============================================================================
+func _set_tap_radius(val: float) -> void:
+	shader_tap_radius = val
+	RenderingServer.global_shader_parameter_set("tap_radius", val)
+
 func handle_tap_wave(delta: float) -> void:
 	if tap_cooldown_timer > 0.0:
 		tap_cooldown_timer -= delta
@@ -558,17 +568,46 @@ func handle_tap_wave(delta: float) -> void:
 	if not is_wave_active:
 		return
 
-	current_tap_radius += wave_speed * delta
-	RenderingServer.global_shader_parameter_set("tap_radius", current_tap_radius)
+	match wave_phase:
+		WavePhase.EXPAND:
+			current_tap_radius += wave_speed * delta
+			if current_tap_radius >= active_max_radius:
+				current_tap_radius = active_max_radius
+				wave_phase = WavePhase.HOLD
+				wave_timer = 0.0
+				var encoded_val: float = -(floorf(active_max_radius) + 0.999)
+				_set_tap_radius(encoded_val)
+			else:
+				_set_tap_radius(current_tap_radius)
 
-	if current_tap_radius >= active_max_radius:
-		is_wave_active = false
-		current_tap_radius = 0.0
-		RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
+		WavePhase.HOLD:
+			wave_timer += delta
+			var encoded_val: float = -(floorf(active_max_radius) + 0.999)
+			_set_tap_radius(encoded_val)
+			if wave_timer >= wave_hold_duration:
+				wave_phase = WavePhase.FADE
+				wave_timer = 0.0
+
+		WavePhase.FADE:
+			wave_timer += delta
+			var progress: float = clampf(wave_timer / wave_fade_duration, 0.0, 1.0)
+			var fade_alpha: float = lerpf(0.999, 0.0, progress)
+			var encoded_val: float = -(floorf(active_max_radius) + clampf(fade_alpha, 0.001, 0.999))
+			_set_tap_radius(encoded_val)
+
+			if progress >= 1.0:
+				wave_phase = WavePhase.IDLE
+				is_wave_active = false
+				current_tap_radius = 0.0
+				tap_cooldown_timer = tap_cooldown
+				_set_tap_radius(0.0)
 
 func trigger_surface_tap() -> void:
-	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
-	var origin: Vector3 = camera.global_position
+	var world_3d := get_world_3d()
+	if not world_3d:
+		return
+	var space_state: PhysicsDirectSpaceState3D = world_3d.direct_space_state
+	var origin: Vector3 = camera.global_position if camera else global_position
 
 	# Cek apakah ada dinding dalam jangkauan tangan (Depan, Kanan, Kiri)
 	var wall_directions: Array[Vector3] = [
@@ -603,10 +642,12 @@ func trigger_surface_tap() -> void:
 	active_max_radius = wall_tap_max_radius if hit_wall else floor_tap_max_radius
 
 	RenderingServer.global_shader_parameter_set("tap_origin", closest_hit_pos)
-	RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
+	_set_tap_radius(0.0)
 	current_tap_radius = 0.0
+	wave_timer = 0.0
+	wave_phase = WavePhase.EXPAND
 	is_wave_active = true
-	tap_cooldown_timer = tap_cooldown
+	tap_cooldown_timer = 0.0
 
 	# 1. Putar audio TapEchoPlayer ping pertama
 	if tap_echo_player:
