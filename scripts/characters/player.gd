@@ -15,6 +15,8 @@ const BOB_FREQUENCY_SPRINT = 20.0
 const BOB_AMPLITUDE_WALK = 0.05
 const BOB_AMPLITUDE_SPRINT = 0.06
 const BOB_RESET_SPEED = 10.0
+const BREATH_FREQUENCY = 1.6
+const BREATH_AMPLITUDE = 0.015
 const SPRINT_FOV = 80.0
 const FOV_TRANSITION_SPEED = 8.0
 
@@ -46,7 +48,10 @@ const TAP_MAX_RADIUS = 8.0      # Batas maksimal gelombang merambat (sesuai GDD)
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var flashlight: SpotLight3D = $Head/Camera3D/Flashlight
+@onready var outline_pass: MeshInstance3D = get_node_or_null("Head/Camera3D/OutlinePass")
 @onready var view_model: CanvasLayer = get_node_or_null("ViewModel")
+
+var outline_material: ShaderMaterial
 
 var is_sprinting: bool = false
 var is_flashlight_on: bool = false
@@ -60,6 +65,7 @@ var is_flicker_dark: bool = false
 var initial_camera_pos: Vector3 = Vector3.ZERO
 var base_fov: float = 75.0
 var bob_time: float = 0.0
+var breath_time: float = 0.0
 
 # Variabel Gelombang Tap
 var current_tap_radius: float = 0.0
@@ -76,6 +82,15 @@ func _ready() -> void:
 	RenderingServer.global_shader_parameter_set("tap_radius", 0.0)
 	if view_model and view_model.has_method("update_flashlight_visual"):
 		view_model.update_flashlight_visual(false)
+	if outline_pass:
+		outline_pass.visible = true
+		outline_material = outline_pass.get_active_material(0) as ShaderMaterial
+		if outline_material:
+			outline_material.set_shader_parameter("flashlight_view_pos", flashlight.position)
+			outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
+			outline_material.set_shader_parameter("flashlight_cos_angle", cos(deg_to_rad(flashlight.spot_angle)))
+			outline_material.set_shader_parameter("flashlight_range", flashlight.spot_range)
+			outline_material.set_shader_parameter("flashlight_on", false)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
@@ -132,6 +147,8 @@ func _physics_process(delta: float) -> void:
 	handle_camera_dynamics(delta)
 	handle_flashlight_heat(delta)
 	handle_tap_wave(delta)
+	if outline_material:
+		outline_material.set_shader_parameter("flashlight_on", flashlight.visible and flashlight.light_energy > 0.0)
 
 # Fungsi kontrol dinamika kamera (Head Bob & Dynamic Sprint FOV)
 func handle_camera_dynamics(delta: float) -> void:
@@ -139,17 +156,29 @@ func handle_camera_dynamics(delta: float) -> void:
 	var target_fov = SPRINT_FOV if is_sprinting else base_fov
 	camera.fov = lerp(camera.fov, target_fov, FOV_TRANSITION_SPEED * delta)
 
-	# 2. Procedural Head Bob
+	# 2. Procedural Head Bob & Idle Breathing
 	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
-	if is_on_floor() and horizontal_speed > 0.1:
+	var is_moving = is_on_floor() and horizontal_speed > 0.1
+	var is_idle = is_on_floor() and not is_moving
+	if is_moving:
+		breath_time = 0.0
 		var freq = BOB_FREQUENCY_SPRINT if is_sprinting else BOB_FREQUENCY_WALK
 		var amp = BOB_AMPLITUDE_SPRINT if is_sprinting else BOB_AMPLITUDE_WALK
 		bob_time += freq * delta
 		camera.position.y = initial_camera_pos.y + sin(bob_time) * amp
 		camera.position.x = initial_camera_pos.x + cos(bob_time * 0.5) * (amp * 0.5)
+	elif is_idle:
+		bob_time = 0.0
+		breath_time += BREATH_FREQUENCY * delta
+		var target_pos = initial_camera_pos + Vector3(0.0, sin(breath_time) * BREATH_AMPLITUDE, 0.0)
+		camera.position = camera.position.lerp(target_pos, minf(BOB_RESET_SPEED * delta, 1.0))
 	else:
 		bob_time = 0.0
-		camera.position = camera.position.lerp(initial_camera_pos, BOB_RESET_SPEED * delta)
+		breath_time = 0.0
+		camera.position = camera.position.lerp(initial_camera_pos, minf(BOB_RESET_SPEED * delta, 1.0))
+
+	if view_model and view_model.has_method("set_idle"):
+		view_model.set_idle(is_idle)
 
 # Fungsi untuk menggerakkan cincin gelombang ke mesh-mesh sekitar
 func handle_tap_wave(delta: float) -> void:

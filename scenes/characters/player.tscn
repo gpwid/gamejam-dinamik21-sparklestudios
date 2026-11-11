@@ -2,8 +2,12 @@
 
 [ext_resource type="Script" uid="uid://dsrej012wr47s" path="res://scripts/characters/player.gd" id="1_rp718"]
 [ext_resource type="PackedScene" uid="uid://cviewmodel001" path="res://scenes/characters/view_model.tscn" id="2_vm"]
+[ext_resource type="Material" uid="uid://cnoiroutline01" path="res://assets/material/noir_outline.tres" id="3_outline"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ol4vb"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_outline"]
+size = Vector2(2, 2)
 
 [node name="Player" type="CharacterBody3D" unique_id=1286990361]
 script = ExtResource("1_rp718")
@@ -12,6 +16,14 @@ script = ExtResource("1_rp718")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
 [node name="Camera3D" type="Camera3D" parent="Head" unique_id=2034605404]
+
+[node name="OutlinePass" type="MeshInstance3D" parent="Head/Camera3D" unique_id=1982736451]
+visible = false
+cast_shadow = 0
+extra_cull_margin = 16384.0
+ignore_occlusion_culling = true
+mesh = SubResource("QuadMesh_outline")
+surface_material_override/0 = ExtResource("3_outline")
 
 [node name="Flashlight" type="SpotLight3D" parent="Head/Camera3D" unique_id=818398398]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, -0.351, 0)
