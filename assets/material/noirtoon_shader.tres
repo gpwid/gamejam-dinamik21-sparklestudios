@@ -5,6 +5,8 @@
 [resource]
 render_priority = 0
 shader = ExtResource("1_mdjsa")
-shader_parameter/outline_thickness = 0.45
+shader_parameter/outline_thickness = 0.42
 shader_parameter/use_floor_grid = true
 shader_parameter/grid_size = 2.0
+shader_parameter/hatch_threshold = 0.12
+shader_parameter/hatch_scale = 0.75

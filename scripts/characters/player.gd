@@ -82,6 +82,12 @@ const CRITICAL_DROP_TIME_MAX: float = 0.09
 @export var double_ping_delay: float = 0.22    # Jeda pemutaran audio echo kedua (detik)
 
 # ==============================================================================
+# DEBUG OPTIONS
+# ==============================================================================
+@export_group("Debug")
+@export var debug_infinite_flashlight: bool = false
+
+# ==============================================================================
 # PENGATURAN INTERAKSI
 # ==============================================================================
 @export_group("Interaction")
@@ -212,11 +218,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		mouse_input_accumulator.x += mouse_x
 		mouse_input_accumulator.y += mouse_y
 
+	# Debug: Toggle Infinite Flashlight dengan tombol F1
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F1:
+		debug_infinite_flashlight = !debug_infinite_flashlight
+		if debug_infinite_flashlight:
+			is_overheated = false
+			current_heat = 0.0
+			overheat_timer = 0.0
+			if view_model and view_model.has_method("play_overheat_warning"):
+				view_model.play_overheat_warning(false)
+		print("[DEBUG] Infinite Flashlight: ", "AKTIF (Permanen)" if debug_infinite_flashlight else "NONAKTIF")
+
 	# 4. Toggle Flashlight + Ignition Heat Spike (Anti-Feathering)
 	if event.is_action_pressed("toggle_flashlight"):
 		if is_overheated:
-			print("Heat: ", snapped(current_heat, 0.1), " | Overheated: true (Menunggu dingin...)")
-			return
+			if debug_infinite_flashlight:
+				is_overheated = false
+				current_heat = 0.0
+			else:
+				print("Heat: ", snapped(current_heat, 0.1), " | Overheated: true (Menunggu dingin...)")
+				return
 
 		is_flashlight_on = !is_flashlight_on
 		flashlight.visible = is_flashlight_on
@@ -232,7 +253,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if flashlight_player.stream:
 				flashlight_player.play()
 
-		if is_flashlight_on:
+		if is_flashlight_on and not debug_infinite_flashlight:
 			current_heat += IGNITION_HEAT_SPIKE
 			if current_heat >= MAX_HEAT:
 				_trigger_overheat()
@@ -427,6 +448,22 @@ func handle_flashlight_sway(delta: float) -> void:
 # SENTER HEAT, ANTI-FEATHERING & WARNING FLICKER (ASLI MAIN)
 # ==============================================================================
 func handle_flashlight_heat(delta: float) -> void:
+	if debug_infinite_flashlight:
+		if is_overheated:
+			is_overheated = false
+			current_heat = 0.0
+			overheat_timer = 0.0
+			if view_model and view_model.has_method("play_overheat_warning"):
+				view_model.play_overheat_warning(false)
+		current_heat = 0.0
+		is_flicker_dark = false
+		flicker_timer = 0.0
+		flashlight.visible = is_flashlight_on
+		flashlight.light_energy = 1.0
+		if view_model and view_model.has_method("update_flashlight_visual"):
+			view_model.update_flashlight_visual(is_flashlight_on)
+		return
+
 	if is_overheated:
 		overheat_timer -= delta
 		if overheat_timer <= 0.0:
