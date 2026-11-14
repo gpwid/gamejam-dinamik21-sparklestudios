@@ -62,6 +62,12 @@ use_collision = true
 size = Vector3(20, 0.05, 20)
 material = SubResource("ShaderMaterial_eno46")
 
+[node name="CSGBox3D2" type="CSGBox3D" parent="." unique_id=256220958]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, -0.2290039, -9.666171)
+use_collision = true
+size = Vector3(20, 0.05, 20)
+material = SubResource("ShaderMaterial_eno46")
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=885196880]
 environment = SubResource("Environment_ol4vb")
 
@@ -73,7 +79,7 @@ transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0.8853972, -0.121294
 [node name="Monitor tabung1" parent="." unique_id=2102185628 instance=ExtResource("5_q1j05")]
 transform = Transform3D(0.11225156, 0, -0.01887149, 0, 0.11471193, 0, 0.022230307, 0, 0.09529127, 1.2577977, 0.5683279, -2.7579455)
 
-[node name="Kubus_001" parent="Monitor tabung1" index="0" unique_id=2064610293]
+[node name="Kubus_001" parent="Monitor tabung1" index="0" unique_id=382640150]
 transform = Transform3D(1.882759, 0, -2.9802322e-08, 0, 1.6849236, 0, -2.9802322e-08, 0, 1.419117, 0, 0, 0)
 surface_material_override/0 = ExtResource("3_q1j05")
 
@@ -116,6 +122,7 @@ transform = Transform3D(0.13, 0, 0, 0, 0.13, 0, 0, 0, 0.13, -1.1563551, 1.318977
 surface_material_override/0 = ExtResource("3_q1j05")
 
 [node name="BézierCurve_001" parent="Saklar/BézierCurve_002" index="0" unique_id=1077056697]
+cast_shadow = 0
 surface_material_override/0 = ExtResource("3_q1j05")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Saklar/BézierCurve_002" index="1" unique_id=1265323339]
@@ -141,6 +148,8 @@ transform = Transform3D(0.1, 0, -4.9683715e-09, 0, 0.1, 0, 4.9683715e-09, 0, 0.1
 surface_material_override/0 = ExtResource("3_q1j05")
 
 [node name="Cube" parent="Lever/Cube_005" index="0" unique_id=1963641057]
+transform = Transform3D(1, 0, 3.5527137e-15, 0, 1, 0, -3.5527137e-15, 0, 1, 0.4285469, -3.2400532, -0.41403198)
+cast_shadow = 0
 surface_material_override/0 = ExtResource("3_q1j05")
 
 [node name="Lemari" parent="." unique_id=989966511 instance=ExtResource("11_51qdv")]
@@ -164,6 +173,7 @@ shape = SubResource("ConcavePolygonShape3D_4bhi4")
 transform = Transform3D(-0.027489025, 0, 0.13202275, 0, 0.1348542, 0, -0.13202275, 0, -0.027489025, 1.1759887, -0.060274005, -2.1196587)
 
 [node name="Cube_003" parent="Kursi" index="0" unique_id=184884468]
+transform = Transform3D(1, 0, -5.9604645e-08, 0, 1.0000002, 0, 5.9604645e-08, 0, 1, -1.6593018, 0, -10.373231)
 surface_material_override/0 = ExtResource("3_q1j05")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Kursi/Cube_003" index="0" unique_id=808719803]

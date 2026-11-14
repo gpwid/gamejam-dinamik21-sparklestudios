@@ -90,8 +90,8 @@ void fragment() {
 	}
 
 	if (lum_c > 0.15) {
-		// Area terang di dalam senter: garis tepi siluet & sudut berwarna HITAM (jangan hapus garis putih echolocation di luar senter)
-		if (in_spot && (pos_lap > depth_edge_threshold || is_crease)) {
+		// Area terang di dalam senter: garis tepi siluet berwarna HITAM (sudut tajam objek sudah ditangani oleh material shader.gdshader)
+		if (in_spot && (pos_lap > depth_edge_threshold)) {
 			final_col = vec3(0.0);
 		}
 	} else {
