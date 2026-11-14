@@ -152,6 +152,7 @@ var current_tap_radius: float = 0.0
 var shader_tap_radius: float = 0.0
 var active_max_radius: float = 17.0
 var tap_cooldown_timer: float = 0.0
+var is_snapping: bool = false
 
 # Signals
 signal flashlight_exploded(player_position: Vector3)
@@ -263,9 +264,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		if view_model and view_model.has_method("update_flashlight_visual"):
 			view_model.update_flashlight_visual(flashlight.visible and not is_overheated)
 
-	# 5. Wall-Tap / Floor-Tap Echolocation (Dengan Cooldown)
-	if event.is_action_pressed("wall_tap") and not is_flashlight_on and not is_wave_active and tap_cooldown_timer <= 0.0:
-		trigger_surface_tap()
+	# 5. Wall-Tap / Floor-Tap Echolocation (Dengan Cooldown & Animasi Snap ViewModel)
+	if event.is_action_pressed("wall_tap") and not is_flashlight_on and not is_wave_active and not is_snapping and tap_cooldown_timer <= 0.0:
+		if view_model and view_model.has_method("play_snap_animation"):
+			is_snapping = true
+			view_model.play_snap_animation(
+				func(): trigger_surface_tap(),
+				func(): is_snapping = false
+			)
+		else:
+			trigger_surface_tap()
 
 	# 6. Interaksi Objek (Wajib Senter Menyala)
 	if event.is_action_pressed("interact"):
@@ -395,8 +403,11 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 		breath_offset.y = sin(breath_time) * BREATH_AMPLITUDE_Y
 		breath_offset.x = cos(breath_time * 0.5) * BREATH_AMPLITUDE_X
 
-	if view_model and view_model.has_method("set_idle"):
-		view_model.set_idle(is_idle)
+	if view_model:
+		if view_model.has_method("update_movement"):
+			view_model.update_movement(is_moving, is_sprinting, horizontal_speed, delta)
+		elif view_model.has_method("set_idle"):
+			view_model.set_idle(is_idle)
 
 	camera.position = initial_camera_pos + bob_offset + breath_offset + Vector3(0.0, landing_compression_y, 0.0)
 
