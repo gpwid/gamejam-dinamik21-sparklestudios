@@ -1,0 +1,30 @@
+extends SceneTree
+
+func _init() -> void:
+	print("Checking monster textures...")
+	var tex1 = load("res://assets/textures/placeholders/monster.jpeg")
+	print("tex1: ", tex1)
+	var scream = load("res://assets/audio/sfx/trigger_scream.wav")
+	print("scream: ", scream)
+	var ui = load("res://scenes/ui/game_over_ui.tscn")
+	print("ui scene: ", ui)
+	var monster_scene = load("res://scenes/characters/monster.tscn")
+	print("monster scene: ", monster_scene)
+	var monster_instance = monster_scene.instantiate()
+	print("monster instance: ", monster_instance)
+	monster_instance.free()
+
+	print("Checking test_world.tscn...")
+	var test_world_scene = load("res://scenes/level/test_world.tscn")
+	print("test_world_scene: ", test_world_scene)
+	var world_instance = test_world_scene.instantiate()
+	print("world_instance: ", world_instance)
+	var player = world_instance.find_child("Player", true, false)
+	var monster = world_instance.find_child("Monster", true, false)
+	print("Player: ", player, " Monster: ", monster)
+	assert(player != null, "Player must be in test_world")
+	assert(monster != null, "Monster must be in test_world")
+	world_instance.free()
+	print("test_world.tscn loaded successfully with Player and Monster!")
+
+	quit(0 if (tex1 != null and scream != null and monster_scene != null and test_world_scene != null) else 1)

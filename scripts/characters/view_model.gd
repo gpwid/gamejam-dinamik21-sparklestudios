@@ -16,7 +16,7 @@ class_name ViewModel
 @onready var right_hand_texture: TextureRect = hand_texture
 @onready var left_hand_container: Control = get_node_or_null("LeftHandContainer")
 @onready var left_hand_texture: TextureRect = get_node_or_null("LeftHandContainer/LeftHandTexture")
-@onready var exhaustion_vignette: ColorRect = get_node_or_null("ExhaustionVignette")
+@onready var exhaustion_blur: ColorRect = get_node_or_null("ExhaustionVignette")
 
 var snap_tween: Tween
 var is_snapping: bool = false
@@ -33,9 +33,11 @@ var is_flashlight_lit: bool = false
 var is_overheated_visual: bool = false
 var current_hand_color: Color = COLOR_DIM
 
-# Kelelahan (Stamina habis / Exhaustion)
+# Kelelahan & Pandangan Buram (Screen Blur)
 var is_exhausted: bool = false
-var exhaustion_intensity: float = 0.0
+var is_recovering_from_exhaustion: bool = false
+var blur_intensity: float = 0.0
+var target_blur_intensity: float = 0.0
 
 # Pengaturan Bobbing Jalan & Bernapas (Idle)
 # 4.3 rad/s setara periode ~1.46 detik, seirama dengan siklus tarikan napas audio idle_breathing.wav
@@ -52,6 +54,7 @@ var is_sprinting: bool = false
 var is_idle: bool = true
 var breath_time: float = 0.0
 var walk_bob_time: float = 0.0
+var walk_bob_weight: float = 0.0
 var current_bob: Vector2 = Vector2.ZERO
 var current_left_bob: Vector2 = Vector2.ZERO
 
@@ -79,30 +82,38 @@ func _update_pivot() -> void:
 		left_hand_texture.pivot_offset = left_hand_texture.size * Vector2(0.25, 0.95)
 
 func _process(delta: float) -> void:
-	# Update efek visual kelelahan (Vignette merah layar & tint tangan)
-	var target_intensity: float = 1.0 if is_exhausted else 0.0
-	exhaustion_intensity = lerpf(exhaustion_intensity, target_intensity, clampf(4.0 * delta, 0.0, 1.0))
+	# 1. Update efek visual kelelahan (Screen Blur dinamis & halus)
+	blur_intensity = lerpf(blur_intensity, target_blur_intensity, clampf(5.0 * delta, 0.0, 1.0))
+	if target_blur_intensity == 0.0 and blur_intensity < 0.005:
+		blur_intensity = 0.0
 
-	if is_instance_valid(exhaustion_vignette) and exhaustion_vignette.material is ShaderMaterial:
-		(exhaustion_vignette.material as ShaderMaterial).set_shader_parameter("vignette_intensity", exhaustion_intensity)
+	if is_instance_valid(exhaustion_blur) and exhaustion_blur.material is ShaderMaterial:
+		(exhaustion_blur.material as ShaderMaterial).set_shader_parameter("blur_intensity", blur_intensity)
 
 	_update_hand_modulate(delta)
 
-	var target_bob: Vector2 = Vector2.ZERO
+	if not is_instance_valid(hand_texture) and not is_instance_valid(left_hand_texture):
+		return
 
-	if is_moving:
-		var freq: float = WALK_BOB_FREQ_SPRINT if is_sprinting else WALK_BOB_FREQ_WALK
-		var mult: float = 1.35 if is_sprinting else 1.0
-		walk_bob_time += freq * delta
-		target_bob.x = cos(walk_bob_time * 0.5) * WALK_BOB_AMP_X * mult
-		target_bob.y = -abs(sin(walk_bob_time)) * WALK_BOB_AMP_Y * mult
-	else:
-		walk_bob_time = 0.0
-		breath_time += BREATH_FREQUENCY * delta
-		target_bob.x = cos(breath_time * 0.5) * 1.5
-		# Bobbing naik-turun halus sinkron dengan tarikan dan hembusan napas
-		target_bob.y = (1.0 - cos(breath_time)) * 0.5 * BREATH_AMPLITUDE_PX
+	# 2. Transisi halus gerak tangan Idle Breathing <-> Berlari (Task 2)
+	breath_time += BREATH_FREQUENCY * delta
+	var idle_bob := Vector2(
+		cos(breath_time * 0.5) * 1.5,
+		(1.0 - cos(breath_time)) * 0.5 * BREATH_AMPLITUDE_PX
+	)
 
+	var freq: float = WALK_BOB_FREQ_SPRINT if is_sprinting else WALK_BOB_FREQ_WALK
+	var mult: float = 1.35 if is_sprinting else 1.0
+	walk_bob_time += freq * delta
+	var walk_bob := Vector2(
+		cos(walk_bob_time * 0.5) * WALK_BOB_AMP_X * mult,
+		-abs(sin(walk_bob_time)) * WALK_BOB_AMP_Y * mult
+	)
+
+	var target_weight: float = 1.0 if is_moving else 0.0
+	walk_bob_weight = lerpf(walk_bob_weight, target_weight, clampf(6.0 * delta, 0.0, 1.0))
+
+	var target_bob: Vector2 = idle_bob.lerp(walk_bob, walk_bob_weight)
 	current_bob = current_bob.lerp(target_bob, clampf(10.0 * delta, 0.0, 1.0))
 
 	# Bobbing tangan kiri selaras secara simetris dengan tangan kanan
@@ -129,43 +140,68 @@ func update_movement(moving: bool, sprinting: bool, _speed: float, _delta: float
 
 func set_exhausted(exhausted: bool) -> void:
 	is_exhausted = exhausted
+	if exhausted:
+		is_recovering_from_exhaustion = true
+		target_blur_intensity = 1.0
+	elif not is_recovering_from_exhaustion:
+		target_blur_intensity = 0.0
+
+func update_stamina_blur(stamina: float, max_stamina: float, exhausted: bool) -> void:
+	is_exhausted = exhausted
+	var stamina_ratio: float = clampf(stamina / max_stamina, 0.0, 1.0)
+
+	# Saat stamina habis/mentok (0.0) atau saat status exhausted terpicu:
+	# Efek blur harus TETAP PENUH (maksimal 1.0)
+	if exhausted or stamina <= 0.0:
+		is_recovering_from_exhaustion = true
+		target_blur_intensity = 1.0
+	elif is_recovering_from_exhaustion:
+		# Tingkat keburamannya berkurang secara bertahap mengikuti persentase stamina yang sedang terisi kembali
+		# (baru benar-benar jernih saat stamina sudah pulih total)
+		target_blur_intensity = 1.0 - stamina_ratio
+		if stamina_ratio >= 0.98:
+			is_recovering_from_exhaustion = false
+			target_blur_intensity = 0.0
+	else:
+		# Saat sprint normal (sebelum habis total)
+		if stamina_ratio < 0.25:
+			target_blur_intensity = (1.0 - (stamina_ratio / 0.25)) * 0.35
+		else:
+			target_blur_intensity = 0.0
+
+func update_flashlight_heat(_heat: float, _max_heat_val: float, _is_on: bool, _overheated: bool) -> void:
+	# Parameter exposure dihitung murni di background pada Player (tanpa UI visual)
+	pass
+
+func show_flashlight_ping_notice() -> void:
+	# UI notifikasi visual dinonaktifkan (digantikan oleh audio trigger)
+	pass
 
 func update_flashlight_visual(is_on: bool) -> void:
 	is_flashlight_lit = is_on
 	_update_hand_modulate(0.0)
 
-func play_overheat_warning(is_overheated: bool) -> void:
-	is_overheated_visual = is_overheated
-	# Jika terjadi overheat maupun saat overheat berakhir, senter selalu padam (tidak boleh menyala putih)
-	is_flashlight_lit = false
+func play_overheat_warning(is_overheated_flag: bool) -> void:
+	is_overheated_visual = is_overheated_flag
 	_update_hand_modulate(0.0)
 
 func _update_hand_modulate(delta: float = 0.0) -> void:
 	var base_col: Color = COLOR_DIM
-	if is_overheated_visual:
-		base_col = COLOR_OVERHEAT
-	elif is_flashlight_lit:
-		base_col = COLOR_LIT
+	if is_flashlight_lit:
+		if is_overheated_visual:
+			# Senter menyala redup saat masa kejar
+			base_col = Color(0.72, 0.55, 0.55, 1.0)
+		else:
+			base_col = COLOR_LIT
+	elif is_overheated_visual:
+		# Senter mati saat masa kejar
+		base_col = Color(0.35, 0.22, 0.22, 1.0)
 
-	var final_col: Color = base_col
-	if exhaustion_intensity > 0.001:
-		# Denyut kemerahan lembut HANYA pada kanal warna RGB, Alpha DIKUNCI 1.0 (tetap 100% solid)
-		var pulse: float = 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.0043)
-		var red_tint := Color(
-			base_col.r,
-			base_col.g * lerpf(0.45, 0.75, pulse),
-			base_col.b * lerpf(0.45, 0.75, pulse),
-			1.0
-		)
-		final_col = base_col.lerp(red_tint, exhaustion_intensity)
-		final_col.a = 1.0
-	else:
-		final_col.a = 1.0
-
+	base_col.a = 1.0
 	if delta > 0.0:
-		current_hand_color = current_hand_color.lerp(final_col, clampf(16.0 * delta, 0.0, 1.0))
+		current_hand_color = current_hand_color.lerp(base_col, clampf(16.0 * delta, 0.0, 1.0))
 	else:
-		current_hand_color = final_col
+		current_hand_color = base_col
 	current_hand_color.a = 1.0
 
 	if is_instance_valid(hand_texture):

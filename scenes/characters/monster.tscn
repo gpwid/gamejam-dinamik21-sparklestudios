@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/monster.gd" id="1_script"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/trigger_scream.wav" id="2_scream"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_over_ui.tscn" id="3_gameover"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_monster"]
+radius = 0.45
+height = 2.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_monster"]
+size = Vector2(1.2, 2)
+
+[node name="Monster" type="CharacterBody3D"]
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_monster")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+layers = 1
+mesh = SubResource("QuadMesh_monster")
+
+[node name="ScreamPlayer" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("2_scream")
+max_distance = 50.0
+
+[node name="GameOverUI" parent="." instance=ExtResource("3_gameover")]

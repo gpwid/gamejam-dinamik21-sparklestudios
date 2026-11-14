@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://b4b4xjtfi7iyx" path="res://assets/3d/Lemari.glb" id="11_51qdv"]
 [ext_resource type="PackedScene" uid="uid://bar7f0v0alpgs" path="res://assets/3d/Kursi.glb" id="12_4bhi4"]
 [ext_resource type="PackedScene" uid="uid://yxn6228jjx0f" path="res://assets/3d/kasur.glb" id="13_ctoua"]
+[ext_resource type="PackedScene" path="res://scenes/characters/monster.tscn" id="14_monster"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_eno46"]
 render_priority = 0
@@ -72,6 +73,9 @@ material = SubResource("ShaderMaterial_eno46")
 environment = SubResource("Environment_ol4vb")
 
 [node name="Player" parent="." unique_id=1286990361 instance=ExtResource("2_sspuo")]
+
+[node name="Monster" parent="." instance=ExtResource("14_monster")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -5)
 
 [node name="table" parent="." unique_id=1493196024 instance=ExtResource("4_sspuo")]
 transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0.8853972, -0.1212945, -3.1684766)
