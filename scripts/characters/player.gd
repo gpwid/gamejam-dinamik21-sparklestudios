@@ -24,7 +24,7 @@ const BOB_AMPLITUDE_SPRINT: float = 0.08
 const BOB_RESET_SPEED: float = 10.0
 
 # 2. Idle Breathing
-const BREATH_FREQUENCY: float = 0.35 # Frekuensi pernapasan 0.35 Hz
+const BREATH_FREQUENCY: float = 0.685 # Frekuensi pernapasan ~0.685 Hz (siklus ~1.46 detik, sinkron dengan idle_breathing.wav)
 const BREATH_AMPLITUDE_Y: float = 0.01
 const BREATH_AMPLITUDE_X: float = 0.005
 
@@ -102,6 +102,27 @@ const CRITICAL_DROP_TIME_MAX: float = 0.09
 @export var echo_sound: AudioStream
 @export var landing_sound: AudioStream
 
+# ==============================================================================
+# SISTEM STAMINA & NAFAS (DIEGETIK / TANPA UI)
+# ==============================================================================
+@export_group("Stamina Dynamics")
+@export var max_stamina: float = 100.0
+@export var stamina_drain_rate: float = 11.0        # Habis dalam ~9.1 detik sprint terus-menerus (durasi diperpanjang)
+@export var stamina_recovery_rate: float = 18.0     # Pulih penuh dalam ~5.5 detik
+@export var stamina_recovery_delay: float = 0.7     # Jeda setelah berhenti sprint sebelum mulai pulih
+@export var exhausted_walk_speed: float = 1.8       # Kecepatan melambat saat kehabisan napas (normal: 3.0)
+@export var exhaustion_recovery_threshold: float = 30.0 # Batas stamina pulih sebelum bisa sprint lagi
+
+@export_group("Breathing Audio Levels")
+@export var idle_breath_volume_still: float = -14.0  # Suara napas santai diam (lembut dan tidak dominan)
+@export var idle_breath_volume_moving: float = -18.0 # Suara napas santai saat jalan (samar di balik footstep)
+@export var run_breath_start_vol: float = -14.0      # Volume awal lari (sama persis dengan idle agar transisi mulus)
+@export var run_breath_max_vol: float = 1.0          # Volume puncak napas lari saat stamina sekarat
+
+var current_stamina: float = 100.0
+var is_exhausted: bool = false
+var stamina_recovery_timer: float = 0.0
+
 # Node References (Termasuk OutlinePass dari branch main!)
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -110,8 +131,14 @@ const CRITICAL_DROP_TIME_MAX: float = 0.09
 @onready var landing_player: AudioStreamPlayer3D = get_node_or_null("LandingPlayer")
 @onready var flashlight_player: AudioStreamPlayer = get_node_or_null("FlashlightPlayer")
 @onready var tap_echo_player: AudioStreamPlayer3D = get_node_or_null("TapEchoPlayer")
+@onready var idle_breathing_player: AudioStreamPlayer = get_node_or_null("IdleBreathingPlayer")
+@onready var running_breathing_player: AudioStreamPlayer = get_node_or_null("RunningBreathingPlayer")
+@onready var exhaustion_player: AudioStreamPlayer = get_node_or_null("ExhaustionPlayer")
 @onready var outline_pass: MeshInstance3D = get_node_or_null("Head/Camera3D/OutlinePass")
 @onready var view_model: CanvasLayer = get_node_or_null("ViewModel")
+
+var idle_breath_target_vol: float = -80.0
+var running_breath_target_vol: float = -80.0
 
 var outline_material: ShaderMaterial
 
@@ -169,6 +196,7 @@ func _ready() -> void:
 
 	_set_tap_radius(0.0)
 	_init_audio_fallbacks()
+	_init_breathing_audio()
 
 	if view_model and view_model.has_method("update_flashlight_visual"):
 		view_model.update_flashlight_visual(false)
@@ -286,8 +314,17 @@ func _physics_process(delta: float) -> void:
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
 
-	is_sprinting = Input.is_action_pressed("sprint") and direction.length() > 0.1
-	var current_speed: float = SPRINT_SPEED if is_sprinting else WALK_SPEED
+	var wants_to_sprint: bool = Input.is_action_pressed("sprint") and direction.length() > 0.1 and not is_sliding_on_wall
+	if wants_to_sprint and not is_exhausted and current_stamina > 0.0:
+		is_sprinting = true
+	else:
+		is_sprinting = false
+
+	var current_speed: float = WALK_SPEED
+	if is_sprinting:
+		current_speed = SPRINT_SPEED
+	elif is_exhausted:
+		current_speed = exhausted_walk_speed
 
 	var accel: float = ACCELERATION if is_on_floor() else (ACCELERATION * AIR_CONTROL_FACTOR)
 	var decel: float = DECELERATION if is_on_floor() else (DECELERATION * AIR_CONTROL_FACTOR * 0.25)
@@ -324,6 +361,7 @@ func _physics_process(delta: float) -> void:
 			velocity.x = 0.0
 			velocity.z = 0.0
 			horizontal_speed = 0.0
+			is_sprinting = false
 		elif into_wall_dot > 0.1:
 			# KONDISI B - SLIDING MIRING (into_wall_dot > 0.1 dan < 0.82):
 			is_sliding_on_wall = true
@@ -337,10 +375,16 @@ func _physics_process(delta: float) -> void:
 				velocity.z = h_vel.y
 			horizontal_speed = minf(horizontal_speed, max_slide_speed)
 
+	# Jika tertahan dinding atau objek diam (kecepatan horizontal < 0.2), hentikan sprint
+	if is_on_floor() and horizontal_speed < 0.2:
+		is_sprinting = false
+
 	handle_camera_immersion(delta, input_dir, horizontal_speed)
 	update_flashlight_sway(delta)
 	handle_flashlight_heat(delta)
 	handle_tap_wave(delta)
+	handle_stamina(delta, horizontal_speed > 0.2)
+	handle_breathing_audio(delta, horizontal_speed > 0.2)
 
 	if outline_material:
 		outline_material.set_shader_parameter("flashlight_on", flashlight.visible and flashlight.light_energy > 0.0)
@@ -720,3 +764,119 @@ func trigger_surface_tap() -> void:
 		view_model.play_tap_recoil()
 
 	print("Tap! ", "Objek (17m)" if hit_wall else "Lantai (6m)", " | Kecepatan: ", wave_speed, " m/s")
+
+# ==============================================================================
+# MANAJEMEN AUDIO NAFAS & REGENERASI STAMINA (DIEGETIK TANPA UI)
+# ==============================================================================
+func _init_breathing_audio() -> void:
+	if idle_breathing_player:
+		idle_breathing_player.volume_db = -80.0
+		idle_breathing_player.finished.connect(func():
+			if is_instance_valid(idle_breathing_player):
+				idle_breathing_player.play()
+		)
+		idle_breathing_player.play()
+
+	if running_breathing_player:
+		running_breathing_player.volume_db = -80.0
+		running_breathing_player.finished.connect(func():
+			if is_instance_valid(running_breathing_player):
+				running_breathing_player.play()
+		)
+		running_breathing_player.play()
+
+func handle_stamina(delta: float, is_moving: bool) -> void:
+	if is_sprinting and is_moving:
+		stamina_recovery_timer = stamina_recovery_delay
+		current_stamina = maxf(0.0, current_stamina - stamina_drain_rate * delta)
+		if current_stamina <= 0.0 and not is_exhausted:
+			_trigger_exhaustion()
+	else:
+		if stamina_recovery_timer > 0.0:
+			stamina_recovery_timer -= delta
+		else:
+			current_stamina = minf(max_stamina, current_stamina + stamina_recovery_rate * delta)
+
+		if is_exhausted and current_stamina >= exhaustion_recovery_threshold:
+			_clear_exhaustion()
+
+func _trigger_exhaustion() -> void:
+	is_exhausted = true
+	is_sprinting = false
+
+	# 1. Hentikan seketika suara lari agar TIDAK overlap dengan suara out of breath
+	running_breath_target_vol = -80.0
+	if running_breathing_player:
+		running_breathing_player.stop()
+		running_breathing_player.volume_db = -80.0
+
+	# 2. Suara out of breath diputar tegas tanpa overlap
+	if exhaustion_player:
+		exhaustion_player.volume_db = -3.0
+		exhaustion_player.pitch_scale = randf_range(0.96, 1.04)
+		exhaustion_player.play()
+
+	if view_model and view_model.has_method("set_exhausted"):
+		view_model.set_exhausted(true)
+
+	print("Stamina Habis! Terkena penalti lambat (exhausted).")
+
+func _clear_exhaustion() -> void:
+	is_exhausted = false
+	if view_model and view_model.has_method("set_exhausted"):
+		view_model.set_exhausted(false)
+	print("Napas pulih kembali, siap sprint.")
+
+func handle_breathing_audio(delta: float, is_moving: bool) -> void:
+	if is_sprinting:
+		# Pastikan running breath menyala
+		if running_breathing_player and not running_breathing_player.playing:
+			running_breathing_player.volume_db = run_breath_start_vol
+			running_breathing_player.play()
+
+		# Suara lari dimulai persis dari volume idle (tanpa cut/drop tiba-tiba)
+		# lalu semakin keras dan berat seiring habisnya stamina
+		var drain_ratio: float = 1.0 - clampf(current_stamina / max_stamina, 0.0, 1.0)
+		running_breath_target_vol = lerpf(run_breath_start_vol, run_breath_max_vol, drain_ratio)
+		if running_breathing_player:
+			running_breathing_player.pitch_scale = lerpf(0.98, 1.08, drain_ratio)
+
+		# Idle breathing perlahan padam
+		idle_breath_target_vol = -80.0
+
+	elif is_exhausted:
+		# Selama exhausted, running breathing MATI TOTAL (tidak overlap)
+		running_breath_target_vol = -80.0
+		if running_breathing_player and running_breathing_player.playing:
+			running_breathing_player.stop()
+
+		# Selama suara out of breath masih berbunyi, idle breathing juga senyap
+		if exhaustion_player and exhaustion_player.playing:
+			idle_breath_target_vol = -80.0
+		else:
+			# Setelah suara out of breath selesai, napas santai perlahan masuk kembali seiring pemulihan
+			if idle_breathing_player and not idle_breathing_player.playing:
+				idle_breathing_player.volume_db = -80.0
+				idle_breathing_player.play()
+			var recovery_progress: float = clampf(current_stamina / exhaustion_recovery_threshold, 0.0, 1.0)
+			idle_breath_target_vol = lerpf(-26.0, idle_breath_volume_still, recovery_progress)
+
+	else:
+		# Berhenti sprint: redam suara lari
+		running_breath_target_vol = -80.0
+		if running_breathing_player and running_breathing_player.volume_db <= -70.0 and running_breathing_player.playing:
+			running_breathing_player.stop()
+
+		# Nyalakan idle breath jika belum menyala
+		if idle_breathing_player and not idle_breathing_player.playing:
+			idle_breathing_player.volume_db = -80.0
+			idle_breathing_player.play()
+
+		# Volume santai: lebih pelan saat bergerak, sedikit lebih jelas saat diam
+		idle_breath_target_vol = idle_breath_volume_still if not is_moving else idle_breath_volume_moving
+
+	# Crossfade halus dengan lerp
+	if idle_breathing_player:
+		idle_breathing_player.volume_db = lerpf(idle_breathing_player.volume_db, idle_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))
+	if running_breathing_player:
+		running_breathing_player.volume_db = lerpf(running_breathing_player.volume_db, running_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))

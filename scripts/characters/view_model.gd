@@ -8,6 +8,7 @@ class_name ViewModel
 
 @onready var hand_container: Control = $HandContainer
 @onready var hand_texture: TextureRect = $HandContainer/HandTexture
+@onready var exhaustion_vignette: ColorRect = get_node_or_null("ExhaustionVignette")
 
 var snap_tween: Tween
 var is_snapping: bool = false
@@ -17,9 +18,17 @@ const COLOR_LIT: Color = Color(1.0, 1.0, 1.0, 1.0)
 const COLOR_DIM: Color = Color(0.25, 0.25, 0.3, 1.0)
 const COLOR_OVERHEAT: Color = Color(0.9, 0.2, 0.2, 1.0)
 
+var is_flashlight_lit: bool = false
+var is_overheated_visual: bool = false
+
+# Kelelahan (Stamina habis / Exhaustion)
+var is_exhausted: bool = false
+var exhaustion_intensity: float = 0.0
+
 # Pengaturan Bobbing Jalan & Bernapas (Idle)
-const BREATH_FREQUENCY: float = 1.6
-const BREATH_AMPLITUDE_PX: float = 3.5
+# 4.3 rad/s setara periode ~1.46 detik, seirama dengan siklus tarikan napas audio idle_breathing.wav
+const BREATH_FREQUENCY: float = 4.3
+const BREATH_AMPLITUDE_PX: float = 4.0
 
 const WALK_BOB_FREQ_WALK: float = 10.0
 const WALK_BOB_FREQ_SPRINT: float = 14.0
@@ -47,6 +56,15 @@ func _update_pivot() -> void:
 		hand_texture.pivot_offset = hand_texture.size * Vector2(0.75, 0.95)
 
 func _process(delta: float) -> void:
+	# Update efek visual kelelahan (Vignette merah layar & tint tangan)
+	var target_intensity: float = 1.0 if is_exhausted else 0.0
+	exhaustion_intensity = lerpf(exhaustion_intensity, target_intensity, clampf(4.0 * delta, 0.0, 1.0))
+
+	if is_instance_valid(exhaustion_vignette) and exhaustion_vignette.material is ShaderMaterial:
+		(exhaustion_vignette.material as ShaderMaterial).set_shader_parameter("vignette_intensity", exhaustion_intensity)
+
+	_update_hand_modulate()
+
 	if not is_instance_valid(hand_texture):
 		return
 	if is_snapping:
@@ -64,6 +82,7 @@ func _process(delta: float) -> void:
 		walk_bob_time = 0.0
 		breath_time += BREATH_FREQUENCY * delta
 		target_bob.x = cos(breath_time * 0.5) * 1.5
+		# Bobbing naik-turun halus sinkron dengan tarikan dan hembusan napas
 		target_bob.y = (1.0 - cos(breath_time)) * 0.5 * BREATH_AMPLITUDE_PX
 
 	current_bob = current_bob.lerp(target_bob, clampf(10.0 * delta, 0.0, 1.0))
@@ -79,20 +98,42 @@ func update_movement(moving: bool, sprinting: bool, _speed: float, _delta: float
 	is_sprinting = sprinting
 	is_idle = not moving
 
+func set_exhausted(exhausted: bool) -> void:
+	is_exhausted = exhausted
+
 func update_flashlight_visual(is_on: bool) -> void:
-	if not is_instance_valid(hand_texture):
-		return
-	var target_col: Color = COLOR_LIT if is_on else COLOR_DIM
-	if hand_texture.modulate != target_col:
-		hand_texture.modulate = target_col
+	is_flashlight_lit = is_on
+	_update_hand_modulate()
 
 func play_overheat_warning(is_overheated: bool) -> void:
+	is_overheated_visual = is_overheated
+	_update_hand_modulate()
+
+func _update_hand_modulate() -> void:
 	if not is_instance_valid(hand_texture):
 		return
-	if is_overheated:
-		hand_texture.modulate = COLOR_OVERHEAT
+
+	var base_col: Color = COLOR_DIM
+	if is_overheated_visual:
+		base_col = COLOR_OVERHEAT
+	elif is_flashlight_lit:
+		base_col = COLOR_LIT
+
+	if exhaustion_intensity > 0.001:
+		# Denyut kemerahan lembut HANYA pada kanal warna RGB, Alpha DIKUNCI 1.0 (tetap 100% solid)
+		var pulse: float = 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.0043)
+		var red_tint := Color(
+			base_col.r,
+			base_col.g * lerpf(0.45, 0.75, pulse),
+			base_col.b * lerpf(0.45, 0.75, pulse),
+			1.0
+		)
+		var final_col: Color = base_col.lerp(red_tint, exhaustion_intensity)
+		final_col.a = 1.0 # Menjamin sprite tangan 100% solid tanpa transparansi
+		hand_texture.modulate = final_col
 	else:
-		update_flashlight_visual(false)
+		base_col.a = 1.0
+		hand_texture.modulate = base_col
 
 func play_tap_recoil() -> void:
 	# Jika sedang menjalankan snap animation, recoil sudah ditangani oleh Tween snap

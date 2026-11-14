@@ -6,6 +6,9 @@
 [ext_resource type="AudioStream" uid="uid://cmnbvo1e2klnb" path="res://assets/audio/sfx/switch.wav" id="4_switch"]
 [ext_resource type="AudioStream" uid="uid://cy0105vqsyh5j" path="res://assets/audio/sfx/echo.wav" id="5_echo"]
 [ext_resource type="Material" uid="uid://cnoiroutline01" path="res://assets/material/noir_outline.tres" id="3_outline"]
+[ext_resource type="AudioStream" uid="uid://dgxwkox1ovl0c" path="res://assets/audio/sfx/idle_breathing.wav" id="6_idle_breath"]
+[ext_resource type="AudioStream" uid="uid://byy6cgfb4w5l3" path="res://assets/audio/sfx/running_breathing.wav" id="7_run_breath"]
+[ext_resource type="AudioStream" uid="uid://dpaoqysjcl5fr" path="res://assets/audio/sfx/out_of_breath.wav" id="8_out_breath"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ol4vb"]
 
@@ -59,5 +62,17 @@ max_distance = 15.0
 [node name="TapEchoPlayer" type="AudioStreamPlayer3D" parent="." unique_id=534819286]
 max_polyphony = 4
 max_distance = 25.0
+
+[node name="IdleBreathingPlayer" type="AudioStreamPlayer" parent="." unique_id=64829101]
+stream = ExtResource("6_idle_breath")
+volume_db = -80.0
+
+[node name="RunningBreathingPlayer" type="AudioStreamPlayer" parent="." unique_id=64829102]
+stream = ExtResource("7_run_breath")
+volume_db = -80.0
+
+[node name="ExhaustionPlayer" type="AudioStreamPlayer" parent="." unique_id=64829103]
+stream = ExtResource("8_out_breath")
+volume_db = -4.0
 
 [node name="ViewModel" parent="." instance=ExtResource("2_vm")]
