@@ -3,7 +3,8 @@
 [ext_resource type="Texture2D" uid="uid://ip6dcl8370nm" path="res://assets/sprites/righthand_idle.png" id="1_tex"]
 [ext_resource type="Script" uid="uid://dbnc22y2j2vjr" path="res://scripts/characters/view_model.gd" id="2_script"]
 [ext_resource type="Script" uid="uid://bxrentakmumd0" path="res://scripts/ui/reticle.gd" id="3_reticle"]
-[ext_resource type="Shader" path="res://assets/material/vignette.gdshader" id="4_vignette"]
+[ext_resource type="Shader" uid="uid://b773s2f7yf53h" path="res://assets/material/vignette.gdshader" id="4_vignette"]
+[ext_resource type="Texture2D" uid="uid://cuk31jjd4ml47" path="res://assets/sprites/lefthand_flashlight.png" id="5_lefthand"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vig"]
 shader = ExtResource("4_vignette")
@@ -22,7 +23,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(1, 1, 1, 1)
 
 [node name="Reticle" type="Control" parent="." unique_id=654341579]
 layout_mode = 3
@@ -36,7 +36,31 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_reticle")
 
-[node name="HandContainer" type="Control" parent="." unique_id=2136438044]
+[node name="LeftHandContainer" type="Control" parent="." unique_id=-1158529251]
+layout_mode = 3
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = -315.0
+offset_right = 285.0
+offset_bottom = 45.0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="LeftHandTexture" type="TextureRect" parent="LeftHandContainer" unique_id=1988246704]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_lefthand")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RightHandContainer" type="Control" parent="." unique_id=2136438044]
 layout_mode = 3
 anchors_preset = 3
 anchor_left = 1.0
@@ -44,14 +68,14 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -285.0
-offset_top = -320.0
+offset_top = -315.0
 offset_right = -5.0
-offset_bottom = 40.0
+offset_bottom = 45.0
 grow_horizontal = 0
 grow_vertical = 0
 mouse_filter = 2
 
-[node name="HandTexture" type="TextureRect" parent="HandContainer" unique_id=988246703]
+[node name="HandTexture" type="TextureRect" parent="RightHandContainer" unique_id=988246703]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

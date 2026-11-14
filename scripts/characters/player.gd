@@ -254,12 +254,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_overheated = false
 			current_heat = 0.0
 			overheat_timer = 0.0
-			if view_model and view_model.has_method("play_overheat_warning"):
-				view_model.play_overheat_warning(false)
+			if view_model:
+				if view_model.has_method("update_flashlight_visual"):
+					view_model.update_flashlight_visual(is_flashlight_on)
+				if view_model.has_method("play_overheat_warning"):
+					view_model.play_overheat_warning(false)
 		print("[DEBUG] Infinite Flashlight: ", "AKTIF (Permanen)" if debug_infinite_flashlight else "NONAKTIF")
 
 	# 4. Toggle Flashlight + Ignition Heat Spike (Anti-Feathering)
 	if event.is_action_pressed("toggle_flashlight"):
+		# Animasi klik tangan kiri SELALU dimainkan setiap tombol ditekan (bahkan saat overheat / spam panik)
+		if view_model and view_model.has_method("play_flashlight_click"):
+			view_model.play_flashlight_click()
+
+		# Suara klik tombol saklar senter selalu berbunyi mekanis
+		if flashlight_player:
+			flashlight_player.pitch_scale = randf_range(0.95, 1.05)
+			if switch_sound:
+				flashlight_player.stream = switch_sound
+			if flashlight_player.stream:
+				flashlight_player.play()
+
 		if is_overheated:
 			if debug_infinite_flashlight:
 				is_overheated = false
@@ -274,13 +289,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		flicker_timer = 0.0
 		is_flicker_dark = false
 		cooling_delay_timer = COOLING_DELAY
-
-		if flashlight_player:
-			flashlight_player.pitch_scale = randf_range(0.95, 1.05)
-			if switch_sound:
-				flashlight_player.stream = switch_sound
-			if flashlight_player.stream:
-				flashlight_player.play()
 
 		if is_flashlight_on and not debug_infinite_flashlight:
 			current_heat += IGNITION_HEAT_SPIKE
@@ -525,8 +533,11 @@ func handle_flashlight_heat(delta: float) -> void:
 			is_overheated = false
 			current_heat = 0.0
 			print("Senter pulih dari overheat!")
-			if view_model and view_model.has_method("play_overheat_warning"):
-				view_model.play_overheat_warning(false)
+			if view_model:
+				if view_model.has_method("update_flashlight_visual"):
+					view_model.update_flashlight_visual(false)
+				if view_model.has_method("play_overheat_warning"):
+					view_model.play_overheat_warning(false)
 		return
 
 	if is_flashlight_on:
@@ -607,8 +618,11 @@ func _trigger_overheat() -> void:
 	flicker_timer = 0.0
 	overheat_timer = OVERHEAT_COOLDOWN
 	print("Heat: 100.0 | OVERHEAT! Senter padam selama 4 detik.")
-	if view_model and view_model.has_method("play_overheat_warning"):
-		view_model.play_overheat_warning(true)
+	if view_model:
+		if view_model.has_method("update_flashlight_visual"):
+			view_model.update_flashlight_visual(false)
+		if view_model.has_method("play_overheat_warning"):
+			view_model.play_overheat_warning(true)
 	emit_signal("flashlight_exploded", global_position)
 
 # ==============================================================================
