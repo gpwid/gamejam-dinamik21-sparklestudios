@@ -36,11 +36,22 @@ enum ChaseSource {
 @export var wall_stuck_timeout: float = 1.0                  # Jika mentok menabrak rintangan > 1.0s, ganti titik tujuan
 @export var min_patrol_distance: float = 3.0                 # Jarak minimal titik patroli baru dari posisi saat ini
 
+@export_group("AStar Navigation & Avoidance")
+@export var grid_cell_size: float = 0.4                      # Ukuran sel grid pemindaian (0.4m - 0.5m)
+@export var grid_bounds_min: Vector2 = Vector2(-9.6, -9.6)   # Batas minimum area lantai (X, Z)
+@export var grid_bounds_max: Vector2 = Vector2(9.6, 9.6)     # Batas maksimum area lantai (X, Z)
+@export var scan_height: float = 0.6                         # Ketinggian raycast/shape scan dari lantai
+@export var obstacle_margin_radius: float = 0.42             # Radius bentuk pengecekan fisika (margin badan monster)
+@export var chase_recalc_interval: float = 0.25              # Interval kalkulasi ulang rute A* saat mengejar player
+@export var avoidance_ray_length: float = 0.85               # Panjang raycast penghalus belokan di depan monster
+@export var avoidance_ray_angle: float = 32.0                # Sudut raycast samping kiri & kanan (derajat)
+@export var waypoint_reach_dist: float = 0.4                 # Jarak ambang batas mencapai waypoint rute A*
+
 @export_group("Detection & Ranges")
 @export var jumpscare_distance: float = 1.4
 @export var patrol_radius: float = 10.0
 @export var hearing_radius: float = 6.0
-@export var direct_trigger_chase_duration: float = 18.0
+@export var direct_trigger_chase_duration: float = 4.0       # Wajib: 4.0 detik kejaran saat disorot senter
 @export var direct_shine_cone_tolerance: float = 0.05
 
 @export_group("Timers & Delays")
@@ -62,6 +73,7 @@ enum ChaseSource {
 @onready var sprite: Sprite3D = get_node_or_null("Sprite3D")
 @onready var collision_shape: CollisionShape3D = get_node_or_null("CollisionShape3D")
 @onready var scream_player: AudioStreamPlayer3D = get_node_or_null("ScreamPlayer")
+@onready var jumpscare_light: OmniLight3D = get_node_or_null("JumpscareLight")
 @onready var game_over_ui: CanvasLayer = get_node_or_null("GameOverUI")
 
 # ==============================================================================
@@ -72,12 +84,18 @@ var chase_source: ChaseSource = ChaseSource.NONE
 
 var spawn_position: Vector3 = Vector3.ZERO
 var target_position: Vector3 = Vector3.ZERO
+var last_target_position: Vector3 = Vector3.INF
 var state_timer: float = 0.0
 var direct_chase_timer: float = 0.0
 var stuck_timer: float = 0.0
 var is_waiting: bool = false
 var has_screamed_chase: bool = false
 var current_waypoint_index: int = -1
+
+var astar_grid: AStarGrid2D = null
+var current_path: Array[Vector3] = []
+var current_path_index: int = 0
+var path_recalc_timer: float = 0.0
 
 var player: Node3D = null
 
@@ -91,8 +109,16 @@ func _ready() -> void:
 	_init_visuals()
 	_init_audio()
 	_init_default_waypoints()
+	_init_navigation_grid()
 	_find_player()
 	target_position = get_next_patrol_target()
+	last_target_position = target_position
+	current_path = find_path_to(target_position)
+	current_path_index = 0
+
+	# Pemindaian ulang pada physics frame pertama untuk memastikan semua sibling StaticBody / CSGBox di level sudah siap
+	if is_inside_tree() and get_tree():
+		get_tree().physics_frame.connect(scan_obstacles, CONNECT_ONE_SHOT)
 
 func _init_visuals() -> void:
 	var tex := load_monster_texture()
@@ -117,6 +143,21 @@ func _init_visuals() -> void:
 		sprite.texture = tex
 		sprite.position = Vector3(0.0, monster_height * 0.5, 0.0)
 		sprite.layers = 1
+
+	_init_jumpscare_light()
+	reset_monster_visuals()
+
+func _init_jumpscare_light() -> void:
+	if jumpscare_light == null:
+		jumpscare_light = get_node_or_null("JumpscareLight")
+	if jumpscare_light == null:
+		jumpscare_light = OmniLight3D.new()
+		jumpscare_light.name = "JumpscareLight"
+		jumpscare_light.position = Vector3(0.0, 1.4, 0.4)
+		jumpscare_light.light_energy = 3.5
+		jumpscare_light.omni_range = 4.0
+		jumpscare_light.visible = false
+		add_child(jumpscare_light)
 
 func load_monster_texture() -> Texture2D:
 	var tex: Texture2D = null
@@ -262,6 +303,11 @@ func _physics_process(delta: float) -> void:
 # PATROL LOGIC
 # ==============================================================================
 func _update_patrol(delta: float) -> void:
+	if target_position != last_target_position or current_path.is_empty():
+		last_target_position = target_position
+		current_path = find_path_to(target_position)
+		current_path_index = 0
+
 	# 1. Fase Diam Sebentar (1.0 - 2.0 detik) saat sampai di titik tujuan
 	if is_waiting:
 		velocity.x = move_toward(velocity.x, 0.0, acceleration * delta)
@@ -277,7 +323,10 @@ func _update_patrol(delta: float) -> void:
 			is_waiting = false
 			stuck_timer = 0.0
 			target_position = get_next_patrol_target()
-			print("[MONSTER] Jeda patroli selesai. Menuju ke titik patroli baru: ", target_position)
+			last_target_position = target_position
+			current_path = find_path_to(target_position)
+			current_path_index = 0
+			print("[MONSTER] Jeda patroli selesai. Menuju ke titik patroli baru via A*: ", target_position)
 		return
 
 	# 2. Cek apakah sudah sampai di titik tujuan patroli (jarak horizontal <= 0.7m)
@@ -305,13 +354,16 @@ func _update_patrol(delta: float) -> void:
 		if stuck_timer >= wall_stuck_timeout:
 			stuck_timer = 0.0
 			target_position = get_next_patrol_target()
-			print("[MONSTER] Mentok menabrak rintangan > %s detik! Mengalihkan ke titik patroli baru: %s" % [wall_stuck_timeout, target_position])
+			last_target_position = target_position
+			current_path = find_path_to(target_position)
+			current_path_index = 0
+			print("[MONSTER] Mentok menabrak rintangan > %s detik! Mengalihkan ke titik patroli baru via A*: %s" % [wall_stuck_timeout, target_position])
 			return
 	else:
 		stuck_timer = maxf(0.0, stuck_timer - delta * 0.5)
 
-	# 4. Berjalan aktif menuju target_position dengan patrol_speed
-	_move_towards(target_position, patrol_speed, delta)
+	# 4. Berjalan aktif mengikuti rute terdekat A* dengan Raycast Smoothing
+	_follow_path(patrol_speed, delta)
 
 func get_next_patrol_target() -> Vector3:
 	if not patrol_waypoints.is_empty():
@@ -340,6 +392,11 @@ func _pick_new_patrol_target() -> void:
 # INVESTIGATE LOGIC (REAKSI SUARA EKOLOKASI)
 # ==============================================================================
 func _update_investigate(delta: float) -> void:
+	if target_position != last_target_position or current_path.is_empty():
+		last_target_position = target_position
+		current_path = find_path_to(target_position)
+		current_path_index = 0
+
 	if is_waiting:
 		velocity.x = move_toward(velocity.x, 0.0, acceleration * delta)
 		velocity.z = move_toward(velocity.z, 0.0, acceleration * delta)
@@ -357,9 +414,11 @@ func _update_investigate(delta: float) -> void:
 	if diff.length() <= 0.8:
 		is_waiting = true
 		state_timer = investigate_wait_time
+		velocity.x = 0.0
+		velocity.z = 0.0
 		return
 
-	_move_towards(target_position, investigate_speed, delta)
+	_follow_path(investigate_speed, delta)
 
 func _on_echolocation_made(sound_origin: Vector3, radius: float) -> void:
 	if current_state == State.CHASE or current_state == State.JUMPSCARE:
@@ -369,9 +428,12 @@ func _on_echolocation_made(sound_origin: Vector3, radius: float) -> void:
 	if dist <= hearing_radius:
 		current_state = State.INVESTIGATE
 		target_position = sound_origin
+		last_target_position = target_position
+		current_path = find_path_to(sound_origin)
+		current_path_index = 0
 		is_waiting = false
 		state_timer = 0.0
-		print("[MONSTER] Mendengar suara ekolokasi di %s (jarak: %s m). Mendatangi untuk menyelidiki..." % [sound_origin, snapped(dist, 0.1)])
+		print("[MONSTER] Mendengar suara ekolokasi di %s (jarak: %s m). Menuju lokasi via A* Shortest Path..." % [sound_origin, snapped(dist, 0.1)])
 
 # ==============================================================================
 # CHASE LOGIC (KONDISI A & KONDISI B)
@@ -392,7 +454,7 @@ func _update_chase(delta: float) -> void:
 	if chase_source == ChaseSource.DIRECT_SHINE:
 		direct_chase_timer -= delta
 		if direct_chase_timer <= 0.0:
-			print("[MONSTER] Durasi pengejaran sorot senter habis. Pemain berhasil kabur! Kembali ke Patroli.")
+			print("[MONSTER] Durasi pengejaran sorot senter habis (4 detik). Pemain berhasil kabur! Kembali ke Patroli.")
 			_enter_patrol()
 			return
 	elif chase_source == ChaseSource.OVERHEAT:
@@ -404,13 +466,23 @@ func _update_chase(delta: float) -> void:
 			_enter_patrol()
 			return
 
-	_move_towards(player_pos, chase_speed, delta)
+	# Update rute A* secara berkala ke posisi real-time player
+	path_recalc_timer -= delta
+	if path_recalc_timer <= 0.0 or current_path.is_empty() or last_target_position.distance_to(player_pos) > 1.2:
+		path_recalc_timer = chase_recalc_interval
+		target_position = player_pos
+		last_target_position = target_position
+		current_path = find_path_to(player_pos)
+		current_path_index = 0
+
+	_follow_path(chase_speed, delta)
 
 func trigger_direct_shine_chase() -> void:
 	current_state = State.CHASE
 	chase_source = ChaseSource.DIRECT_SHINE
 	direct_chase_timer = direct_trigger_chase_duration
 	is_waiting = false
+	path_recalc_timer = 0.0 # Segera hitung jalur ke posisi player
 	print("[MONSTER] CHASE AKTIF: Monster tersorot senter langsung (Kondisi B)! Durasi kejar: %s detik." % direct_trigger_chase_duration)
 	_play_scream()
 
@@ -427,6 +499,12 @@ func _on_player_flashlight_overheated(player_pos: Vector3) -> void:
 func trigger_overheat_chase() -> void:
 	current_state = State.CHASE
 	chase_source = ChaseSource.OVERHEAT
+	is_waiting = false
+	path_recalc_timer = 0.0
+	print("[MONSTER] CHASE AKTIF: Parameter senter overheat 100% (Kondisi A)!")
+	if not has_screamed_chase:
+		_play_scream()
+		has_screamed_chase = true
 	is_waiting = false
 	print("[MONSTER] CHASE AKTIF: Parameter senter overheat 100% (Kondisi A)!")
 	if not has_screamed_chase:
@@ -499,6 +577,16 @@ func _enter_jumpscare() -> void:
 	state_timer = jumpscare_delay
 	print("[MONSTER] JUMPSCARE! Monster menangkap player pada jarak %s m." % snapped(global_position.distance_to(player.global_position), 0.1))
 	_play_scream()
+
+	# 1. Posisikan wajah monster tepat di depan kamera player (jarak 0.6m - 1.0m, anti-clipping & anti-obstruct)
+	_position_for_jumpscare()
+
+	# 2. Paksa visual monster langsung terlihat jelas di kegelapan:
+	#    - Ubah material secara dinamis: SHADING_MODE_UNSHADED + emission terang
+	#    - Nyalakan cahaya sorot jumpscare (OmniLight3D)
+	_apply_jumpscare_visuals()
+
+	# 3. Kunci pergerakan player dan picu animasi/camera shake jumpscare
 	if player and player.has_method("trigger_jumpscare"):
 		player.trigger_jumpscare(self)
 
@@ -515,21 +603,253 @@ func _update_jumpscare(delta: float) -> void:
 			if game_over_ui and game_over_ui.has_method("show_game_over"):
 				game_over_ui.show_game_over()
 
+func _position_for_jumpscare() -> void:
+	if not is_instance_valid(player):
+		return
+
+	var cam: Camera3D = null
+	if "camera" in player and player.camera is Camera3D:
+		cam = player.camera
+	elif player.has_node("Head/Camera3D"):
+		cam = player.get_node("Head/Camera3D") as Camera3D
+
+	var cam_pos := cam.global_position if cam else (player.global_position + Vector3(0.0, 1.6, 0.0))
+	var jumpscare_dist: float = 0.75 # Berada di rentang aman 0.6m - 1.0m (anti-clipping near=0.05m)
+
+	# Arah horizontal dari kamera ke monster (atau arah pandang kamera)
+	var forward := -cam.global_transform.basis.z if cam else -player.global_transform.basis.z
+	var dir_to_monster := global_position - player.global_position
+	dir_to_monster.y = 0.0
+
+	var target_dir := Vector3.ZERO
+	if dir_to_monster.length() > 0.1:
+		target_dir = dir_to_monster.normalized()
+	else:
+		target_dir = Vector3(forward.x, 0.0, forward.z).normalized()
+		if target_dir.length() < 0.01:
+			target_dir = Vector3(0.0, 0.0, -1.0)
+
+	var target_pos := cam_pos + target_dir * jumpscare_dist
+	target_pos.y = player.global_position.y
+
+	# Anti-Obstruction Check: Raycast dari kamera ke target_pos agar tidak tertutup tembok/objek
+	if is_inside_tree() and get_world_3d():
+		var space_state := get_world_3d().direct_space_state
+		if space_state:
+			var query := PhysicsRayQueryParameters3D.create(cam_pos, target_pos + Vector3(0.0, 1.0, 0.0))
+			var excludes: Array[RID] = [get_rid()]
+			if player is CollisionObject3D:
+				excludes.append(player.get_rid())
+			query.exclude = excludes
+			var hit := space_state.intersect_ray(query)
+			if not hit.is_empty():
+				var hit_pos: Vector3 = hit.position
+				var hit_dir := (hit_pos - cam_pos).normalized()
+				var safe_dist := maxf(0.55, hit_pos.distance_to(cam_pos) - 0.15)
+				target_pos = cam_pos + hit_dir * safe_dist
+				target_pos.y = player.global_position.y
+
+	global_position = target_pos
+
+func _apply_jumpscare_visuals() -> void:
+	# 1. Ubah material secara dinamis: Unshaded + Emission terang
+	var mat: StandardMaterial3D = _get_active_material()
+	if mat:
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.emission_enabled = true
+		mat.emission = Color(1.0, 1.0, 1.0, 1.0)
+		mat.emission_energy_multiplier = 1.2
+		mat.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
+
+	# 2. Nyalakan lampu sorot khusus jumpscare
+	if jumpscare_light:
+		jumpscare_light.visible = true
+		jumpscare_light.light_energy = 3.5
+
+	# 3. Nyalakan juga cahaya di player (flashlight) jika ada agar wajah monster tersinari langsung
+	if is_instance_valid(player) and "flashlight" in player and player.flashlight is SpotLight3D:
+		player.flashlight.visible = true
+		player.flashlight.light_energy = maxf(player.flashlight.light_energy, 1.5)
+
+func reset_monster_visuals() -> void:
+	# Kembalikan material ke mode gameplay normal (100% hitam pekat dalam kegelapan)
+	var mat: StandardMaterial3D = _get_active_material()
+	if mat:
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		mat.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT
+		mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+		mat.emission_enabled = false
+		mat.emission = Color.BLACK
+		mat.emission_energy_multiplier = 0.0
+		mat.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
+
+	if jumpscare_light:
+		jumpscare_light.visible = false
+		jumpscare_light.light_energy = 0.0
+
+func _get_active_material() -> StandardMaterial3D:
+	if mesh_instance and mesh_instance.material_override is StandardMaterial3D:
+		return mesh_instance.material_override as StandardMaterial3D
+	if sprite and sprite.material_override is StandardMaterial3D:
+		return sprite.material_override as StandardMaterial3D
+	return null
+
 # ==============================================================================
-# LOCOMOTION & HELPERS
+# LOCOMOTION, A* NAVIGATION & RAYCAST SMOOTHING
 # ==============================================================================
-func _move_towards(target: Vector3, speed: float, delta: float) -> void:
+func _init_navigation_grid() -> void:
+	astar_grid = AStarGrid2D.new()
+	var w := int(round((grid_bounds_max.x - grid_bounds_min.x) / grid_cell_size))
+	var h := int(round((grid_bounds_max.y - grid_bounds_min.y) / grid_cell_size))
+	astar_grid.region = Rect2i(0, 0, w, h)
+	astar_grid.cell_size = Vector2(grid_cell_size, grid_cell_size)
+	astar_grid.offset = Vector2(grid_bounds_min.x + grid_cell_size * 0.5, grid_bounds_min.y + grid_cell_size * 0.5)
+	astar_grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_EUCLIDEAN
+	astar_grid.default_estimate_heuristic = AStarGrid2D.HEURISTIC_EUCLIDEAN
+	astar_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_AT_LEAST_ONE_WALKABLE
+	astar_grid.update()
+
+	scan_obstacles()
+
+func scan_obstacles() -> void:
+	if astar_grid == null or not is_inside_tree():
+		return
+
+	var world_3d := get_world_3d()
+	if world_3d == null:
+		return
+	var space_state := world_3d.direct_space_state
+	if space_state == null:
+		return
+
+	var r := astar_grid.region
+	var shape := SphereShape3D.new()
+	shape.radius = obstacle_margin_radius
+
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	var excludes: Array[RID] = [get_rid()]
+	if is_instance_valid(player) and player is CollisionObject3D:
+		excludes.append(player.get_rid())
+	query.exclude = excludes
+
+	var solid_count := 0
+	var y_scan := global_position.y + scan_height
+
+	for gx in range(r.size.x):
+		for gz in range(r.size.y):
+			var pos_2d := astar_grid.get_point_position(Vector2i(gx, gz))
+			var check_pos := Vector3(pos_2d.x, y_scan, pos_2d.y)
+			query.transform = Transform3D(Basis(), check_pos)
+			var hits = space_state.intersect_shape(query, 1)
+			if not hits.is_empty():
+				var collider = hits[0].collider
+				# Jangan tandai lantai horizontal sebagai obstacle
+				if collider is CSGBox3D and collider.name == "CSGBox3D":
+					continue
+				astar_grid.set_point_solid(Vector2i(gx, gz), true)
+				solid_count += 1
+
+	print("[MONSTER] Auto-Scan AStarGrid2D selesai. Grid: %dx%d (%d sel), Solid obstacle: %d sel." % [r.size.x, r.size.y, r.size.x * r.size.y, solid_count])
+
+func world_to_grid(world_pos: Vector3) -> Vector2i:
+	if astar_grid == null:
+		return Vector2i.ZERO
+	var gx := int(floor((world_pos.x - grid_bounds_min.x) / grid_cell_size))
+	var gz := int(floor((world_pos.z - grid_bounds_min.y) / grid_cell_size))
+	var r := astar_grid.region
+	return Vector2i(clampi(gx, 0, r.size.x - 1), clampi(gz, 0, r.size.y - 1))
+
+func grid_to_world(grid_pos: Vector2i, y_pos: float = 0.0) -> Vector3:
+	if astar_grid == null:
+		return Vector3(grid_pos.x, y_pos, grid_pos.y)
+	var pos_2d := astar_grid.get_point_position(grid_pos)
+	return Vector3(pos_2d.x, y_pos, pos_2d.y)
+
+func find_nearest_walkable_cell(cell: Vector2i, max_radius: int = 6) -> Vector2i:
+	if astar_grid == null:
+		return cell
+	if astar_grid.is_in_boundsv(cell) and not astar_grid.is_point_solid(cell):
+		return cell
+	for r in range(1, max_radius + 1):
+		for dx in range(-r, r + 1):
+			for dy in range(-r, r + 1):
+				if abs(dx) != r and abs(dy) != r:
+					continue
+				var check := cell + Vector2i(dx, dy)
+				if astar_grid.is_in_boundsv(check) and not astar_grid.is_point_solid(check):
+					return check
+	return cell
+
+func find_path_to(target_pos: Vector3) -> Array[Vector3]:
+	var result_path: Array[Vector3] = []
+	var y_lvl := global_position.y
+
+	if astar_grid == null:
+		result_path.append(Vector3(target_pos.x, y_lvl, target_pos.z))
+		return result_path
+
+	var start_cell := world_to_grid(global_position)
+	var end_cell := world_to_grid(target_pos)
+
+	start_cell = find_nearest_walkable_cell(start_cell)
+	end_cell = find_nearest_walkable_cell(end_cell)
+
+	var pts_2d := astar_grid.get_point_path(start_cell, end_cell, true)
+	if pts_2d.is_empty():
+		result_path.append(Vector3(target_pos.x, y_lvl, target_pos.z))
+		return result_path
+
+	for p in pts_2d:
+		result_path.append(Vector3(p.x, y_lvl, p.y))
+
+	# Jika titik terakhir path agak jauh dari target akhir yang diminta, tambahkan target_pos
+	if not result_path.is_empty():
+		var last_pt := result_path[-1]
+		if Vector2(last_pt.x, last_pt.z).distance_to(Vector2(target_pos.x, target_pos.z)) > 0.15:
+			result_path.append(Vector3(target_pos.x, y_lvl, target_pos.z))
+
+	return result_path
+
+func _follow_path(speed: float, delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	else:
 		velocity.y = -0.1
 
-	var diff := target - global_position
+	if current_path.is_empty():
+		velocity.x = move_toward(velocity.x, 0.0, acceleration * delta)
+		velocity.z = move_toward(velocity.z, 0.0, acceleration * delta)
+		move_and_slide()
+		return
+
+	# Majukan waypoint jika monster sudah mendekati titik waypoint saat ini
+	while current_path_index < current_path.size() - 1:
+		var wp := current_path[current_path_index]
+		var diff_wp := wp - global_position
+		diff_wp.y = 0.0
+		if diff_wp.length() < waypoint_reach_dist:
+			current_path_index += 1
+		else:
+			# Line-of-sight shortcutting: jika titik setelahnya terlihat langsung tanpa rintangan, potong jalur ke sana
+			if current_path_index + 1 < current_path.size() and _has_line_of_sight(current_path[current_path_index + 1]):
+				current_path_index += 1
+			break
+
+	var current_target_pt := current_path[current_path_index]
+	var diff := current_target_pt - global_position
 	diff.y = 0.0
 	var dist := diff.length()
 
 	if dist > 0.05:
 		var desired_dir := diff.normalized()
+
+		# Raycast Smoothing & Local Avoidance di sekitar sudut/pojok objek
+		desired_dir = _apply_raycast_smoothing(desired_dir)
+
+		# Slide collision handling fisik saat menyentuh dinding / objek
 		if is_on_wall():
 			var wall_norm := get_wall_normal()
 			wall_norm.y = 0.0
@@ -546,13 +866,119 @@ func _move_towards(target: Vector3, speed: float, delta: float) -> void:
 
 	move_and_slide()
 
+func _apply_raycast_smoothing(desired_dir: Vector3) -> Vector3:
+	if not is_inside_tree():
+		return desired_dir
+	var world_3d := get_world_3d()
+	if world_3d == null:
+		return desired_dir
+	var space_state := world_3d.direct_space_state
+	if space_state == null:
+		return desired_dir
+
+	var origin := global_position + Vector3(0.0, scan_height, 0.0)
+	var query := PhysicsRayQueryParameters3D.new()
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	var excludes: Array[RID] = [get_rid()]
+	if is_instance_valid(player) and player is CollisionObject3D:
+		excludes.append(player.get_rid())
+	query.exclude = excludes
+
+	var rad := deg_to_rad(avoidance_ray_angle)
+	var dir_center := desired_dir
+	var dir_left := desired_dir.rotated(Vector3.UP, rad)
+	var dir_right := desired_dir.rotated(Vector3.UP, -rad)
+
+	# 1. Center Ray
+	query.from = origin
+	query.to = origin + dir_center * avoidance_ray_length
+	var hit_center := space_state.intersect_ray(query)
+
+	# 2. Left Ray
+	query.to = origin + dir_left * (avoidance_ray_length * 0.85)
+	var hit_left := space_state.intersect_ray(query)
+
+	# 3. Right Ray
+	query.to = origin + dir_right * (avoidance_ray_length * 0.85)
+	var hit_right := space_state.intersect_ray(query)
+
+	var steered_dir := desired_dir
+
+	if not hit_center.is_empty():
+		var col = hit_center.collider
+		if not (col is CSGBox3D and col.name == "CSGBox3D"):
+			var norm: Vector3 = hit_center.normal
+			norm.y = 0.0
+			if norm.length() > 0.01:
+				var slide := steered_dir.slide(norm.normalized()).normalized()
+				if slide.length() > 0.01:
+					steered_dir = slide
+
+	if not hit_left.is_empty():
+		var col = hit_left.collider
+		if not (col is CSGBox3D and col.name == "CSGBox3D"):
+			var norm: Vector3 = hit_left.normal
+			norm.y = 0.0
+			# Dorong ke arah berlawanan dari obstacle kiri (steer right)
+			steered_dir = (steered_dir + norm.normalized() * 0.45).normalized()
+
+	if not hit_right.is_empty():
+		var col = hit_right.collider
+		if not (col is CSGBox3D and col.name == "CSGBox3D"):
+			var norm: Vector3 = hit_right.normal
+			norm.y = 0.0
+			# Dorong ke arah berlawanan dari obstacle kanan (steer left)
+			steered_dir = (steered_dir + norm.normalized() * 0.45).normalized()
+
+	return steered_dir if steered_dir.length() > 0.01 else desired_dir
+
+func _has_line_of_sight(to_pos: Vector3) -> bool:
+	if not is_inside_tree():
+		return false
+	var world_3d := get_world_3d()
+	if world_3d == null:
+		return false
+	var space_state := world_3d.direct_space_state
+	if space_state == null:
+		return false
+
+	var from_pos := global_position + Vector3(0.0, scan_height, 0.0)
+	var target_pos := Vector3(to_pos.x, from_pos.y, to_pos.z)
+	var query := PhysicsRayQueryParameters3D.create(from_pos, target_pos)
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	var excludes: Array[RID] = [get_rid()]
+	if is_instance_valid(player) and player is CollisionObject3D:
+		excludes.append(player.get_rid())
+	query.exclude = excludes
+
+	var hit := space_state.intersect_ray(query)
+	if hit.is_empty():
+		return true
+	if hit.collider is CSGBox3D and hit.collider.name == "CSGBox3D":
+		return true
+	return false
+
+func _move_towards(target: Vector3, speed: float, delta: float) -> void:
+	if current_path.is_empty() or target_position != target:
+		target_position = target
+		last_target_position = target
+		current_path = find_path_to(target)
+		current_path_index = 0
+	_follow_path(speed, delta)
+
 func _enter_patrol() -> void:
 	current_state = State.PATROL
 	chase_source = ChaseSource.NONE
 	has_screamed_chase = false
 	is_waiting = false
 	stuck_timer = 0.0
+	reset_monster_visuals()
 	target_position = get_next_patrol_target()
+	last_target_position = target_position
+	current_path = find_path_to(target_position)
+	current_path_index = 0
 
 func _play_scream() -> void:
 	if scream_player:

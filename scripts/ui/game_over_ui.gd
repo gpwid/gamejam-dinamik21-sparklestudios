@@ -34,4 +34,9 @@ func show_game_over() -> void:
 
 func _on_retry_pressed() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	get_tree().reload_current_scene()
+	if is_inside_tree() and get_tree():
+		var monsters := get_tree().get_nodes_in_group("monster")
+		for m in monsters:
+			if m.has_method("reset_monster_visuals"):
+				m.reset_monster_visuals()
+		get_tree().reload_current_scene()

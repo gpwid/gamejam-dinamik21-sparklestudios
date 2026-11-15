@@ -10,6 +10,7 @@
 [ext_resource type="AudioStream" uid="uid://byy6cgfb4w5l3" path="res://assets/audio/sfx/running_breathing.wav" id="7_run_breath"]
 [ext_resource type="AudioStream" uid="uid://dpaoqysjcl5fr" path="res://assets/audio/sfx/out_of_breath.wav" id="8_out_breath"]
 [ext_resource type="AudioStream" uid="uid://jw2raufb4ap3" path="res://assets/audio/sfx/trigger_scream.wav" id="9_scream"]
+[ext_resource type="AudioStream" uid="uid://dx0fmry2x8syp" path="res://assets/audio/sfx/heartbeat.wav" id="10_heartbeat"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ol4vb"]
 
@@ -23,6 +24,7 @@ switch_sound = ExtResource("4_switch")
 echo_sound = ExtResource("5_echo")
 landing_sound = ExtResource("3_step")
 trigger_scream_sound = ExtResource("9_scream")
+heartbeat_sound = ExtResource("10_heartbeat")
 
 [node name="Head" type="Node3D" parent="." unique_id=928181832]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
@@ -80,5 +82,9 @@ volume_db = -4.0
 [node name="TriggerScreamPlayer" type="AudioStreamPlayer" parent="." unique_id=74829109]
 stream = ExtResource("9_scream")
 volume_db = 0.0
+
+[node name="HeartbeatPlayer" type="AudioStreamPlayer" parent="." unique_id=84829110]
+stream = ExtResource("10_heartbeat")
+volume_db = -80.0
 
 [node name="ViewModel" parent="." instance=ExtResource("2_vm")]

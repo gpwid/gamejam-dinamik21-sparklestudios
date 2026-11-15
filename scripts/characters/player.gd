@@ -100,6 +100,20 @@ const SWAY_SMOOTH_SPEED: float = 11.0
 @export var trigger_scream_sound: AudioStream
 
 # ==============================================================================
+# SISTEM AUDIO DETAK JANTUNG (HEARTBEAT DYNAMICS)
+# ==============================================================================
+@export_group("Heartbeat Audio")
+@export var heartbeat_sound: AudioStream = preload("res://assets/audio/sfx/heartbeat.wav")
+@export var max_heartbeat_distance: float = 15.0
+@export var min_heartbeat_distance: float = 2.5
+@export var slowest_beat_interval: float = 1.1
+@export var fastest_beat_interval: float = 0.38
+@export var min_heartbeat_volume_db: float = -18.0
+@export var max_heartbeat_volume_db: float = 1.0
+@export var min_heartbeat_pitch: float = 0.95
+@export var max_heartbeat_pitch: float = 1.1
+
+# ==============================================================================
 # SISTEM STAMINA & NAFAS (DIEGETIK / TANPA UI)
 # ==============================================================================
 @export_group("Stamina Dynamics")
@@ -132,6 +146,7 @@ var stamina_recovery_timer: float = 0.0
 @onready var running_breathing_player: AudioStreamPlayer = get_node_or_null("RunningBreathingPlayer")
 @onready var exhaustion_player: AudioStreamPlayer = get_node_or_null("ExhaustionPlayer")
 @onready var trigger_scream_player: AudioStreamPlayer = get_node_or_null("TriggerScreamPlayer")
+@onready var heartbeat_player: AudioStreamPlayer = get_node_or_null("HeartbeatPlayer")
 @onready var outline_pass: MeshInstance3D = get_node_or_null("Head/Camera3D/OutlinePass")
 @onready var view_model: CanvasLayer = get_node_or_null("ViewModel")
 
@@ -163,6 +178,10 @@ var has_penalty_lock: bool = false
 var penalty_lock_timer: float = 0.0
 var mouse_input_accumulator: Vector2 = Vector2.ZERO
 var sway_target: Vector3 = Vector3.ZERO
+
+# Heartbeat Dynamics State
+var beat_timer: float = 0.0
+var current_beat_interval: float = 1.1
 
 # Backward-compatibility aliases
 var is_overheated: bool:
@@ -336,6 +355,14 @@ func _init_audio_fallbacks() -> void:
 		add_child(trigger_scream_player)
 	if trigger_scream_player.stream == null and trigger_scream_sound != null:
 		trigger_scream_player.stream = trigger_scream_sound
+	if heartbeat_sound == null:
+		heartbeat_sound = load("res://assets/audio/sfx/heartbeat.wav")
+	if heartbeat_player == null:
+		heartbeat_player = AudioStreamPlayer.new()
+		heartbeat_player.name = "HeartbeatPlayer"
+		add_child(heartbeat_player)
+	if heartbeat_player.stream == null and heartbeat_sound != null:
+		heartbeat_player.stream = heartbeat_sound
 
 func _unhandled_input(event: InputEvent) -> void:
 	if is_jumpscared:
@@ -463,6 +490,9 @@ func toggle_flashlight() -> void:
 			view_model.play_overheat_warning(is_triggered)
 		if view_model.has_method("update_flashlight_heat"):
 			view_model.update_flashlight_heat(current_exposure, max_exposure, is_flashlight_on, is_triggered)
+
+func _process(delta: float) -> void:
+	handle_heartbeat_audio(delta)
 
 func _physics_process(delta: float) -> void:
 	if is_jumpscared:
@@ -1230,10 +1260,95 @@ func trigger_jumpscare(monster_node: Node3D) -> void:
 	velocity = Vector3.ZERO
 	is_sprinting = false
 
+	# Hentikan detak jantung seketika agar tidak bertabrakan dengan audio jeritan
+	if heartbeat_player and heartbeat_player.playing:
+		heartbeat_player.stop()
+	beat_timer = 0.0
+
 	# Putar audio teriakan jumpscare jika belum berbunyi
 	if trigger_scream_player:
 		if trigger_scream_player.stream == null and trigger_scream_sound != null:
 			trigger_scream_player.stream = trigger_scream_sound
 		if trigger_scream_player.stream and not trigger_scream_player.playing:
 			trigger_scream_player.play()
+
+	# Pastikan cahaya senter menyala terang ke arah monster saat jumpscare
+	if flashlight:
+		flashlight.visible = true
+		flashlight.light_energy = maxf(flashlight.light_energy, 1.5)
+
+# ==============================================================================
+# SISTEM AUDIO DETAK JANTUNG (HEARTBEAT DYNAMICS)
+# ==============================================================================
+func handle_heartbeat_audio(delta: float) -> void:
+	# 1. Hentikan audio seketika saat jumpscare / tertangkap
+	if is_jumpscared:
+		if heartbeat_player and heartbeat_player.playing:
+			heartbeat_player.stop()
+		beat_timer = 0.0
+		return
+
+	# 2. Cari monster terdekat di dalam grup "monster"
+	var closest_monster: Node3D = _get_closest_monster()
+	if closest_monster == null or not is_inside_tree():
+		if heartbeat_player and heartbeat_player.playing:
+			heartbeat_player.stop()
+		beat_timer = 0.0
+		return
+
+	# 3. Hitung jarak 3D antara Player dan Monster
+	var dist: float = global_position.distance_to(closest_monster.global_position)
+
+	# 4. Di luar radius (distance > max_heartbeat_distance): hening total & reset timer
+	if dist > max_heartbeat_distance:
+		if heartbeat_player and heartbeat_player.playing:
+			heartbeat_player.stop()
+		beat_timer = 0.0
+		return
+
+	# 5. Di dalam radius: hitung rasio kedekatan t (0.0 pada max_dist, 1.0 pada min_dist)
+	var dist_range: float = max_heartbeat_distance - min_heartbeat_distance
+	var t: float = 0.0
+	if dist_range > 0.001:
+		t = clampf((max_heartbeat_distance - dist) / dist_range, 0.0, 1.0)
+	else:
+		t = 1.0 if dist <= min_heartbeat_distance else 0.0
+
+	# Interpolasi interval detak, volume, dan pitch
+	current_beat_interval = lerpf(slowest_beat_interval, fastest_beat_interval, t)
+	var target_vol: float = lerpf(min_heartbeat_volume_db, max_heartbeat_volume_db, t)
+	var target_pitch: float = lerpf(min_heartbeat_pitch, max_heartbeat_pitch, t)
+
+	if heartbeat_player:
+		heartbeat_player.volume_db = target_vol
+		heartbeat_player.pitch_scale = target_pitch
+
+	# 6. Timer manual pemotong jeda kosong audio (Gap Cutting)
+	# File heartbeat.wav berdurasi 1.0s tapi suara detak hanya ada di 0.0s - 0.4s.
+	# Timer manual memanggil play(0.0) tiap current_beat_interval tanpa menunggu stream selesai.
+	beat_timer += delta
+	if beat_timer >= current_beat_interval:
+		beat_timer = 0.0
+		if heartbeat_player:
+			if heartbeat_player.stream == null and heartbeat_sound != null:
+				heartbeat_player.stream = heartbeat_sound
+			if heartbeat_player.stream != null:
+				heartbeat_player.play(0.0)
+
+func _get_closest_monster() -> Node3D:
+	if not is_inside_tree() or get_tree() == null:
+		return null
+	var monsters := get_tree().get_nodes_in_group("monster")
+	if monsters.is_empty():
+		return null
+	var closest: Node3D = null
+	var min_dist: float = INF
+	var my_pos: Vector3 = global_position
+	for m in monsters:
+		if m is Node3D and is_instance_valid(m) and m.is_inside_tree():
+			var d: float = my_pos.distance_to(m.global_position)
+			if d < min_dist:
+				min_dist = d
+				closest = m
+	return closest
 
