@@ -47,26 +47,22 @@ const SWAY_RETURN_SPEED: float = 7.0
 const SWAY_SMOOTH_SPEED: float = 11.0
 
 # ==============================================================================
-# PENGATURAN SENTER OVERHEAT, ANTI-FEATHERING & WARNING SYSTEM
+# PENGATURAN SENTER EXPOSURE & WARNING SYSTEM (CONFIGURABLE)
 # ==============================================================================
-const MAX_HEAT: float = 100.0
-const HEAT_RATE: float = 15.0
-const COOL_RATE: float = 10.0           # Diperlambat agar tidak bisa spam nyala-mati
-const IGNITION_HEAT_SPIKE: float = 15.0 # Penalti panas instan setiap klik nyala
-const COOLING_DELAY: float = 1.8        # Jeda tahan panas sebelum mulai dingin
-const WARNING_HEAT: float = 70.0
-const CRITICAL_HEAT: float = 85.0
-const OVERHEAT_COOLDOWN: float = 4.0
-
-# Interval Flicker Heat Warning (~0.12s interval pencegah strobe hazard)
-const WARNING_INTERVAL_MIN: float = 0.10
-const WARNING_INTERVAL_MAX: float = 0.14
-
-# Interval Flicker Critical Warning (Intens & tidak teratur)
-const CRITICAL_LIGHT_TIME_MIN: float = 0.06
-const CRITICAL_LIGHT_TIME_MAX: float = 0.14
-const CRITICAL_DROP_TIME_MIN: float = 0.04
-const CRITICAL_DROP_TIME_MAX: float = 0.09
+@export_group("Flashlight Exposure Dynamics")
+@export var max_exposure: float = 100.0
+@export var exposure_increase_rate: float = 6.0       # exposureIncreaseRate: Laju naik saat normal & senter ON (~16.7s nonstop)
+@export var normal_decrease_rate: float = 8.0         # normalDecreaseRate: Laju turun saat belum ke-trigger & senter OFF
+@export var triggered_cooldown_rate_off: float = 15.0 # triggeredCooldownRateOff: Laju turun saat ke-trigger & senter OFF (~6.7s)
+@export var triggered_cooldown_rate_on: float = 4.0   # triggeredCooldownRateOn: Laju turun saat ke-trigger & senter ON (~25s)
+@export var overheated_spot_angle_multiplier: float = 0.45 # overheatedSpotAngleMultiplier: Area sorot jauh lebih kecil saat senter hidup di masa kejar (45%)
+@export var dim_start_threshold: float = 50.0         # dimStartThreshold: Batas mulai area sorot mengecil perlahan (50%)
+@export var flicker_start_threshold: float = 90.0     # flickerStartThreshold: Batas mulai rapid flicker (90%)
+@export var base_light_energy: float = 1.0            # Intensitas cahaya senter normal (100%)
+@export var base_spot_angle: float = 45.0             # Ukuran normal spot angle senter (di-cache dari SpotLight3D)
+@export var base_spot_range: float = 25.0             # Jangkauan normal senter (di-cache dari SpotLight3D)
+@export var auto_shutoff_threshold: float = 15.0      # autoShutoffThreshold: Ambang batas bawah exposure di mana senter mati otomatis oleh sistem
+@export var penalty_lock_duration: float = 20.0       # penaltyLockDuration: Penalti durasi kunci senter (20 detik) jika mati otomatis
 
 # ==============================================================================
 # PENGATURAN GELOMBANG ECHOLOCATION (PERSISTENT REVEAL & SIMULTANEOUS FADE)
@@ -101,6 +97,21 @@ const CRITICAL_DROP_TIME_MAX: float = 0.09
 @export var switch_sound: AudioStream
 @export var echo_sound: AudioStream
 @export var landing_sound: AudioStream
+@export var trigger_scream_sound: AudioStream
+
+# ==============================================================================
+# SISTEM AUDIO DETAK JANTUNG (HEARTBEAT DYNAMICS)
+# ==============================================================================
+@export_group("Heartbeat Audio")
+@export var heartbeat_sound: AudioStream = preload("res://assets/audio/sfx/heartbeat.wav")
+@export var max_heartbeat_distance: float = 15.0
+@export var min_heartbeat_distance: float = 2.5
+@export var slowest_beat_interval: float = 1.1
+@export var fastest_beat_interval: float = 0.38
+@export var min_heartbeat_volume_db: float = -10.0
+@export var max_heartbeat_volume_db: float = 7.0
+@export var min_heartbeat_pitch: float = 0.95
+@export var max_heartbeat_pitch: float = 1.1
 
 # ==============================================================================
 # SISTEM STAMINA & NAFAS (DIEGETIK / TANPA UI)
@@ -134,6 +145,8 @@ var stamina_recovery_timer: float = 0.0
 @onready var idle_breathing_player: AudioStreamPlayer = get_node_or_null("IdleBreathingPlayer")
 @onready var running_breathing_player: AudioStreamPlayer = get_node_or_null("RunningBreathingPlayer")
 @onready var exhaustion_player: AudioStreamPlayer = get_node_or_null("ExhaustionPlayer")
+@onready var trigger_scream_player: AudioStreamPlayer = get_node_or_null("TriggerScreamPlayer")
+@onready var heartbeat_player: AudioStreamPlayer = get_node_or_null("HeartbeatPlayer")
 @onready var outline_pass: MeshInstance3D = get_node_or_null("Head/Camera3D/OutlinePass")
 @onready var view_model: CanvasLayer = get_node_or_null("ViewModel")
 
@@ -149,20 +162,115 @@ var previous_vertical_velocity: float = 0.0
 
 # Flashlight State
 var is_flashlight_on: bool = false
-var is_overheated: bool = false
-var current_heat: float = 0.0
-var overheat_timer: float = 0.0
-var cooling_delay_timer: float = 0.0
+var is_flashlight_locked: bool = false
+var is_triggered: bool = false
+var isTriggered: bool:
+	get: return is_triggered
+	set(val): is_triggered = val
+
+var current_exposure: float = 0.0
+var current_light_energy: float = 1.0
+var current_spot_angle: float = 45.0
 var flicker_timer: float = 0.0
 var is_flicker_dark: bool = false
+var has_triggered_scream: bool = false
+var has_penalty_lock: bool = false
+var penalty_lock_timer: float = 0.0
 var mouse_input_accumulator: Vector2 = Vector2.ZERO
 var sway_target: Vector3 = Vector3.ZERO
+
+# Heartbeat Dynamics State
+var beat_timer: float = 0.0
+var current_beat_interval: float = 1.1
+
+# Backward-compatibility aliases
+var is_overheated: bool:
+	get: return is_triggered
+	set(val): is_triggered = val
+
+var current_heat: float:
+	get: return current_exposure
+	set(val): current_exposure = val
+
+var max_heat: float:
+	get: return max_exposure
+	set(val): max_exposure = val
+
+var heat_increase_rate: float:
+	get: return exposure_increase_rate
+	set(val): exposure_increase_rate = val
+
+var heat_decrease_rate: float:
+	get: return normal_decrease_rate
+	set(val): normal_decrease_rate = val
+
+var exposureIncreaseRate: float:
+	get: return exposure_increase_rate
+	set(val): exposure_increase_rate = val
+
+var normalDecreaseRate: float:
+	get: return normal_decrease_rate
+	set(val): normal_decrease_rate = val
+
+var triggeredCooldownRateOff: float:
+	get: return triggered_cooldown_rate_off
+	set(val): triggered_cooldown_rate_off = val
+
+var triggeredCooldownRateOn: float:
+	get: return triggered_cooldown_rate_on
+	set(val): triggered_cooldown_rate_on = val
+
+var overheated_light_multiplier: float:
+	get: return overheated_spot_angle_multiplier
+	set(val): overheated_spot_angle_multiplier = val
+
+var overheatedLightMultiplier: float:
+	get: return overheated_spot_angle_multiplier
+	set(val): overheated_spot_angle_multiplier = val
+
+var overheatedSpotAngleMultiplier: float:
+	get: return overheated_spot_angle_multiplier
+	set(val): overheated_spot_angle_multiplier = val
+
+var dimStartThreshold: float:
+	get: return dim_start_threshold
+	set(val): dim_start_threshold = val
+
+var flickerStartThreshold: float:
+	get: return flicker_start_threshold
+	set(val): flicker_start_threshold = val
+
+var autoShutoffThreshold: float:
+	get: return auto_shutoff_threshold
+	set(val): auto_shutoff_threshold = val
+
+var end_chase_lockout_threshold: float:
+	get: return auto_shutoff_threshold
+	set(val): auto_shutoff_threshold = val
+
+var endChaseLockoutThreshold: float:
+	get: return auto_shutoff_threshold
+	set(val): auto_shutoff_threshold = val
+
+var penaltyLockDuration: float:
+	get: return penalty_lock_duration
+	set(val): penalty_lock_duration = val
+
+var end_chase_lockout_duration: float:
+	get: return penalty_lock_duration
+	set(val): penalty_lock_duration = val
+
+var endChaseLockoutDuration: float:
+	get: return penalty_lock_duration
+	set(val): penalty_lock_duration = val
 
 # Camera & Immersion Dynamic Variables
 var initial_camera_pos: Vector3 = Vector3.ZERO
 var base_fov: float = 75.0
 var bob_time: float = 0.0
 var breath_time: float = 0.0
+var breath_motion_weight: float = 1.0
+var sprint_audio_factor: float = 0.0
 var current_bob_x: float = 0.0
 var current_bob_y: float = 0.0
 var current_roll_tilt: float = 0.0
@@ -185,11 +293,32 @@ var is_snapping: bool = false
 signal flashlight_exploded(player_position: Vector3)
 signal footstep_stepped(is_sprint: bool)
 signal interaction_failed_in_dark()
+signal echolocation_made(sound_origin: Vector3, radius: float)
+
+# Jumpscare State
+var is_jumpscared: bool = false
+var jumpscare_monster: Node3D = null
+
+func _sync_outline_flashlight() -> void:
+	if outline_material and flashlight:
+		var min_allowed_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+		var safe_spot_angle: float = clampf(flashlight.spot_angle, min_allowed_spot_angle, base_spot_angle)
+		outline_material.set_shader_parameter("flashlight_cos_angle", cos(deg_to_rad(safe_spot_angle)))
+		outline_material.set_shader_parameter("flashlight_range", flashlight.spot_range)
+		outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
+		outline_material.set_shader_parameter("flashlight_on", flashlight.visible and flashlight.spot_range > 0.1 and flashlight.light_energy > 0.0)
 
 func _ready() -> void:
+	add_to_group("player")
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	flashlight.visible = false
-	flashlight.light_energy = 1.0
+	if flashlight:
+		base_spot_angle = flashlight.spot_angle
+		current_spot_angle = base_spot_angle
+		base_spot_range = flashlight.spot_range
+		flashlight.spot_angle_attenuation = 1.0
+		flashlight.visible = false
+		flashlight.light_energy = base_light_energy
+		current_light_energy = base_light_energy
 	initial_camera_pos = camera.position
 	base_fov = camera.fov
 	was_on_floor = is_on_floor()
@@ -203,12 +332,9 @@ func _ready() -> void:
 	if outline_pass:
 		outline_pass.visible = true
 		outline_material = outline_pass.get_active_material(0) as ShaderMaterial
-		if outline_material:
+		if outline_material and flashlight:
 			outline_material.set_shader_parameter("flashlight_view_pos", flashlight.position)
-			outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
-			outline_material.set_shader_parameter("flashlight_cos_angle", cos(deg_to_rad(flashlight.spot_angle)))
-			outline_material.set_shader_parameter("flashlight_range", flashlight.spot_range)
-			outline_material.set_shader_parameter("flashlight_on", false)
+			_sync_outline_flashlight()
 
 func _init_audio_fallbacks() -> void:
 	if footstep_sounds.is_empty():
@@ -221,8 +347,27 @@ func _init_audio_fallbacks() -> void:
 		echo_sound = load("res://assets/audio/sfx/echo.wav")
 	if landing_sound == null and not footstep_sounds.is_empty():
 		landing_sound = footstep_sounds[0]
+	if trigger_scream_sound == null:
+		trigger_scream_sound = load("res://assets/audio/sfx/trigger_scream.wav")
+	if trigger_scream_player == null:
+		trigger_scream_player = AudioStreamPlayer.new()
+		trigger_scream_player.name = "TriggerScreamPlayer"
+		add_child(trigger_scream_player)
+	if trigger_scream_player.stream == null and trigger_scream_sound != null:
+		trigger_scream_player.stream = trigger_scream_sound
+	if heartbeat_sound == null:
+		heartbeat_sound = load("res://assets/audio/sfx/heartbeat.wav")
+	if heartbeat_player == null:
+		heartbeat_player = AudioStreamPlayer.new()
+		heartbeat_player.name = "HeartbeatPlayer"
+		add_child(heartbeat_player)
+	if heartbeat_player.stream == null and heartbeat_sound != null:
+		heartbeat_player.stream = heartbeat_sound
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_jumpscared:
+		return
+
 	# 1. Melepaskan kursor mouse
 	if event.is_action_pressed("ui_cancel"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -251,9 +396,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F1:
 		debug_infinite_flashlight = !debug_infinite_flashlight
 		if debug_infinite_flashlight:
-			is_overheated = false
-			current_heat = 0.0
-			overheat_timer = 0.0
+			is_triggered = false
+			has_triggered_scream = false
+			current_exposure = 0.0
 			if view_model:
 				if view_model.has_method("update_flashlight_visual"):
 					view_model.update_flashlight_visual(is_flashlight_on)
@@ -261,44 +406,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					view_model.play_overheat_warning(false)
 		print("[DEBUG] Infinite Flashlight: ", "AKTIF (Permanen)" if debug_infinite_flashlight else "NONAKTIF")
 
-	# 4. Toggle Flashlight + Ignition Heat Spike (Anti-Feathering)
-	if event.is_action_pressed("toggle_flashlight"):
-		# Animasi klik tangan kiri SELALU dimainkan setiap tombol ditekan (bahkan saat overheat / spam panik)
-		if view_model and view_model.has_method("play_flashlight_click"):
-			view_model.play_flashlight_click()
-
-		# Suara klik tombol saklar senter selalu berbunyi mekanis
-		if flashlight_player:
-			flashlight_player.pitch_scale = randf_range(0.95, 1.05)
-			if switch_sound:
-				flashlight_player.stream = switch_sound
-			if flashlight_player.stream:
-				flashlight_player.play()
-
-		if is_overheated:
-			if debug_infinite_flashlight:
-				is_overheated = false
-				current_heat = 0.0
-			else:
-				print("Heat: ", snapped(current_heat, 0.1), " | Overheated: true (Menunggu dingin...)")
-				return
-
-		is_flashlight_on = !is_flashlight_on
-		flashlight.visible = is_flashlight_on
-		flashlight.light_energy = 1.0
-		flicker_timer = 0.0
-		is_flicker_dark = false
-		cooling_delay_timer = COOLING_DELAY
-
-		if is_flashlight_on and not debug_infinite_flashlight:
-			current_heat += IGNITION_HEAT_SPIKE
-			if current_heat >= MAX_HEAT:
-				_trigger_overheat()
-
-		print("Heat: ", snapped(current_heat, 0.1), " | Overheated: ", is_overheated)
-
-		if view_model and view_model.has_method("update_flashlight_visual"):
-			view_model.update_flashlight_visual(flashlight.visible and not is_overheated)
+	# 4. Toggle Flashlight (Dengan perlindungan echo event)
+	if event.is_action_pressed("toggle_flashlight") and not event.is_echo():
+		toggle_flashlight()
 
 	# 5. Wall-Tap / Floor-Tap Echolocation (Dengan Cooldown & Animasi Snap ViewModel)
 	if event.is_action_pressed("wall_tap") and not is_flashlight_on and not is_wave_active and not is_snapping and tap_cooldown_timer <= 0.0:
@@ -315,7 +425,95 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact"):
 		try_interact()
 
+func toggle_flashlight() -> void:
+	# Jika senter sedang terkunci (akibat penalti 20 detik atau di ambang akhir masa kejar)
+	if is_flashlight_locked or penalty_lock_timer > 0.0:
+		if penalty_lock_timer > 0.0:
+			print("[FLASHLIGHT] Senter TERKUNCI PENALTI 20 DETIK! Sisa waktu: %s detik." % snapped(penalty_lock_timer, 0.1))
+		else:
+			print("[FLASHLIGHT] Senter terkunci di ambang akhir masa kejar! Tunggu masa kejar selesai.")
+		if flashlight_player:
+			flashlight_player.pitch_scale = 0.7
+			if switch_sound:
+				flashlight_player.stream = switch_sound
+			if flashlight_player.stream:
+				flashlight_player.play()
+		return
+
+	if view_model and view_model.has_method("play_flashlight_click"):
+		view_model.play_flashlight_click()
+
+	if flashlight_player:
+		flashlight_player.pitch_scale = randf_range(0.95, 1.05)
+		if switch_sound:
+			flashlight_player.stream = switch_sound
+		if flashlight_player.stream:
+			flashlight_player.play()
+
+	is_flashlight_on = !is_flashlight_on
+	flashlight.visible = is_flashlight_on
+	flicker_timer = 0.0
+	is_flicker_dark = false
+
+	if is_flashlight_on:
+		flashlight.spot_range = base_spot_range
+		flashlight.light_energy = base_light_energy
+		current_light_energy = base_light_energy
+		if is_triggered:
+			current_spot_angle = base_spot_angle * overheated_spot_angle_multiplier
+			flashlight.spot_angle = current_spot_angle
+			print("[FLASHLIGHT] Senter DIPAKSA HIDUP saat Masa Kejar (Spot Sempit %s deg) | Exposure: %s" % [snapped(current_spot_angle, 0.1), snapped(current_exposure, 0.1)])
+		else:
+			if current_exposure >= flicker_start_threshold:
+				current_spot_angle = base_spot_angle * overheated_spot_angle_multiplier
+			elif current_exposure > dim_start_threshold:
+				var t: float = clampf((current_exposure - dim_start_threshold) / (flicker_start_threshold - dim_start_threshold), 0.0, 1.0)
+				current_spot_angle = lerpf(base_spot_angle, base_spot_angle * overheated_spot_angle_multiplier, t)
+			else:
+				current_spot_angle = base_spot_angle
+			flashlight.spot_angle = current_spot_angle
+			print("[FLASHLIGHT] Senter ON | Exposure: ", snapped(current_exposure, 0.1))
+	else:
+		current_light_energy = 0.0
+		flashlight.light_energy = 0.0
+		flashlight.spot_range = base_spot_range
+		current_spot_angle = base_spot_angle
+		flashlight.spot_angle = base_spot_angle
+		print("[FLASHLIGHT] Senter OFF | Exposure: ", snapped(current_exposure, 0.1))
+
+	_sync_outline_flashlight()
+
+	if view_model:
+		if view_model.has_method("update_flashlight_visual"):
+			view_model.update_flashlight_visual(is_flashlight_on)
+		if view_model.has_method("play_overheat_warning"):
+			view_model.play_overheat_warning(is_triggered)
+		if view_model.has_method("update_flashlight_heat"):
+			view_model.update_flashlight_heat(current_exposure, max_exposure, is_flashlight_on, is_triggered)
+
+func _process(delta: float) -> void:
+	handle_heartbeat_audio(delta)
+
 func _physics_process(delta: float) -> void:
+	if is_jumpscared:
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not is_on_floor():
+			velocity += get_gravity() * delta
+		move_and_slide()
+		if is_instance_valid(jumpscare_monster):
+			var look_target := jumpscare_monster.global_position + Vector3(0.0, 1.2, 0.0)
+			var cam_pos := camera.global_position
+			var target_dir := (look_target - cam_pos).normalized()
+			if target_dir.length() > 0.01:
+				var target_yaw := atan2(-target_dir.x, -target_dir.z)
+				var target_pitch := asin(clampf(target_dir.y, -0.99, 0.99))
+				global_rotation.y = lerp_angle(global_rotation.y, target_yaw, 18.0 * delta)
+				head.rotation.x = lerp_angle(head.rotation.x, target_pitch, 18.0 * delta)
+				camera.fov = lerpf(camera.fov, 50.0, 12.0 * delta)
+				camera.position = initial_camera_pos + Vector3(randf_range(-0.06, 0.06), randf_range(-0.06, 0.06), 0.0)
+		return
+
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 
@@ -394,9 +592,7 @@ func _physics_process(delta: float) -> void:
 	handle_stamina(delta, horizontal_speed > 0.2)
 	handle_breathing_audio(delta, horizontal_speed > 0.2)
 
-	if outline_material:
-		outline_material.set_shader_parameter("flashlight_on", flashlight.visible and flashlight.light_energy > 0.0)
-		outline_material.set_shader_parameter("flashlight_view_dir", -flashlight.transform.basis.z.normalized())
+	_sync_outline_flashlight()
 		
 
 # ==============================================================================
@@ -417,10 +613,11 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 
 	var bob_offset: Vector3 = Vector3.ZERO
 	var breath_offset: Vector3 = Vector3.ZERO
-	var is_moving: bool = is_on_floor() and horizontal_speed > 0.1
-	var is_idle: bool = is_on_floor() and not is_moving
+	var is_moving: bool = horizontal_speed > 0.1
+	var is_grounded_moving: bool = is_on_floor() and is_moving
+	var is_idle: bool = not is_moving
 
-	if is_moving:
+	if is_grounded_moving:
 		var freq: float = BOB_FREQUENCY_SPRINT if is_sprinting else BOB_FREQUENCY_WALK
 		var amp: float = BOB_AMPLITUDE_SPRINT if is_sprinting else BOB_AMPLITUDE_WALK
 
@@ -451,13 +648,16 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 		bob_offset.y = current_bob_y
 		bob_offset.x = current_bob_x
 
-		breath_time += 2.0 * PI * BREATH_FREQUENCY * delta
-		breath_offset.y = sin(breath_time) * BREATH_AMPLITUDE_Y
-		breath_offset.x = cos(breath_time * 0.5) * BREATH_AMPLITUDE_X
+	# Transisi halus gerak nafas Idle Breathing <-> Bergerak / Lari (Task 2)
+	breath_time += 2.0 * PI * BREATH_FREQUENCY * delta
+	var target_breath_weight: float = 1.0 if is_idle else 0.0
+	breath_motion_weight = lerpf(breath_motion_weight, target_breath_weight, clampf(5.0 * delta, 0.0, 1.0))
+	breath_offset.y = sin(breath_time) * BREATH_AMPLITUDE_Y * breath_motion_weight
+	breath_offset.x = cos(breath_time * 0.5) * BREATH_AMPLITUDE_X * breath_motion_weight
 
 	if view_model:
 		if view_model.has_method("update_movement"):
-			view_model.update_movement(is_moving, is_sprinting, horizontal_speed, delta)
+			view_model.update_movement(is_grounded_moving, is_sprinting, horizontal_speed, delta)
 		elif view_model.has_method("set_idle"):
 			view_model.set_idle(is_idle)
 
@@ -508,122 +708,274 @@ func handle_flashlight_sway(delta: float) -> void:
 	update_flashlight_sway(delta)
 
 # ==============================================================================
-# SENTER HEAT, ANTI-FEATHERING & WARNING FLICKER (ASLI MAIN)
+# SENTER EXPOSURE, FASE PERINGATAN & COOLDOWN MASA KEJAR
 # ==============================================================================
 func handle_flashlight_heat(delta: float) -> void:
+	handle_flashlight_exposure(delta)
+
+func handle_flashlight_exposure(delta: float) -> void:
+	# Hitung mundur penalti kunci 20 detik (jika terkena penalti Kondisi A)
+	if penalty_lock_timer > 0.0:
+		penalty_lock_timer = maxf(0.0, penalty_lock_timer - delta)
+		if penalty_lock_timer <= 0.0 and not is_triggered:
+			is_flashlight_locked = false
+			has_penalty_lock = false
+			print("[FLASHLIGHT] Penalti kunci 20 detik telah selesai! Kunci senter dibuka.")
+
 	if debug_infinite_flashlight:
-		if is_overheated:
-			is_overheated = false
-			current_heat = 0.0
-			overheat_timer = 0.0
-			if view_model and view_model.has_method("play_overheat_warning"):
-				view_model.play_overheat_warning(false)
-		current_heat = 0.0
+		if is_triggered:
+			is_triggered = false
+			has_triggered_scream = false
+		current_exposure = 0.0
 		is_flicker_dark = false
+		is_flashlight_locked = false
+		has_penalty_lock = false
+		penalty_lock_timer = 0.0
 		flicker_timer = 0.0
 		flashlight.visible = is_flashlight_on
-		flashlight.light_energy = 1.0
-		if view_model and view_model.has_method("update_flashlight_visual"):
-			view_model.update_flashlight_visual(is_flashlight_on)
+		flashlight.light_energy = base_light_energy if is_flashlight_on else 0.0
+		current_light_energy = flashlight.light_energy
+		flashlight.spot_range = base_spot_range
+		flashlight.spot_angle = base_spot_angle
+		current_spot_angle = base_spot_angle
+		_sync_outline_flashlight()
+		if view_model:
+			if view_model.has_method("update_flashlight_visual"):
+				view_model.update_flashlight_visual(is_flashlight_on)
+			if view_model.has_method("play_overheat_warning"):
+				view_model.play_overheat_warning(false)
 		return
 
-	if is_overheated:
-		overheat_timer -= delta
-		if overheat_timer <= 0.0:
-			is_overheated = false
-			current_heat = 0.0
-			print("Senter pulih dari overheat!")
-			if view_model:
-				if view_model.has_method("update_flashlight_visual"):
+	# =========================================================================
+	# KONDISI 1: is_triggered == true (Masa Pengejaran / Cooldown)
+	# Parameter exposure SELALU berkurang menuju 0.0
+	# =========================================================================
+	if is_triggered:
+		# Pengecekan ambang batas auto-shutoff (auto_shutoff_threshold = 15.0)
+		if current_exposure <= auto_shutoff_threshold:
+			# KONDISI A: Jika saat menyentuh ambang ini senter MASIH MENYALA (ON),
+			# maka terpaksa mati otomatis oleh sistem -> Kunci senter + Penalti 20 Detik!
+			if is_flashlight_on:
+				is_flashlight_on = false
+				flashlight.visible = false
+				current_light_energy = 0.0
+				flashlight.light_energy = 0.0
+				flashlight.spot_range = base_spot_range
+				has_penalty_lock = true
+				penalty_lock_timer = penalty_lock_duration # 20.0 detik
+				is_flashlight_locked = true
+				if view_model and view_model.has_method("update_flashlight_visual"):
 					view_model.update_flashlight_visual(false)
-				if view_model.has_method("play_overheat_warning"):
-					view_model.play_overheat_warning(false)
-		return
+				print("[CHASE AUTO-SHUTOFF] Senter mati otomatis di %s%%! Terkena penalti kunci 20 detik setelah masa kejar selesai." % snapped(current_exposure, 0.1))
 
-	if is_flashlight_on:
-		cooling_delay_timer = COOLING_DELAY
-		current_heat += HEAT_RATE * delta
+			# Kunci senter selama di ambang akhir (<= 15.0)
+			is_flashlight_locked = true
 
-		# 1. Critical Warning (heat >= CRITICAL_HEAT): Flicker mati-nyala intens
-		if current_heat >= CRITICAL_HEAT:
-			flicker_timer -= delta
-			if flicker_timer <= 0.0:
-				if is_flicker_dark:
-					is_flicker_dark = false
-					flashlight.visible = true
-					flashlight.light_energy = 1.0
-					flicker_timer = randf_range(CRITICAL_LIGHT_TIME_MIN, CRITICAL_LIGHT_TIME_MAX)
-					if view_model and view_model.has_method("update_flashlight_visual"):
-						view_model.update_flashlight_visual(true)
-				else:
-					is_flicker_dark = true
+			# Cooldown turun cepat (triggered_cooldown_rate_off) karena senter sudah padam
+			current_exposure = move_toward(current_exposure, 0.0, triggered_cooldown_rate_off * delta)
+		else:
+			# Di atas ambang auto-shutoff (> 15.0):
+			if is_flashlight_on:
+				# Poin 2: Senter ON -> exposure turun LEBIH LAMBAT (triggered_cooldown_rate_on)
+				current_exposure = move_toward(current_exposure, 0.0, triggered_cooldown_rate_on * delta)
+
+				# Cek jika penurunan ini baru saja menembus ambang batas auto-shutoff
+				if current_exposure <= auto_shutoff_threshold:
+					# Masuk KONDISI A
+					is_flashlight_on = false
 					flashlight.visible = false
+					current_light_energy = 0.0
 					flashlight.light_energy = 0.0
-					flicker_timer = randf_range(CRITICAL_DROP_TIME_MIN, CRITICAL_DROP_TIME_MAX)
+					flashlight.spot_range = base_spot_range
+					has_penalty_lock = true
+					penalty_lock_timer = penalty_lock_duration
+					is_flashlight_locked = true
 					if view_model and view_model.has_method("update_flashlight_visual"):
 						view_model.update_flashlight_visual(false)
+					print("[CHASE AUTO-SHUTOFF] Senter mati otomatis di %s%%! Terkena penalti kunci 20 detik setelah masa kejar selesai." % snapped(current_exposure, 0.1))
+				else:
+					# Area sorot kecil/sempit (40%-50% dari normal)
+					var target_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+					current_spot_angle = target_angle
+					flashlight.spot_angle = current_spot_angle
+					flashlight.spot_range = base_spot_range
+					flashlight.visible = true
+					flashlight.light_energy = base_light_energy
+					current_light_energy = base_light_energy
+			else:
+				# Poin 2: Senter MATI (OFF) -> exposure turun CEPAT (triggered_cooldown_rate_off)
+				current_exposure = move_toward(current_exposure, 0.0, triggered_cooldown_rate_off * delta)
+				flashlight.visible = false
+				flashlight.light_energy = 0.0
+				current_light_energy = 0.0
+				flashlight.spot_range = base_spot_range
+				if current_exposure <= auto_shutoff_threshold:
+					# KONDISI B: Player mematikan sendiri senter SEBELUM menyentuh ambang batas auto-shutoff!
+					# TIDAK ADA penalti kunci 20 detik!
+					is_flashlight_locked = true
+					print("[CHASE SAFE] Menjelang akhir masa kejar (<= %s%%) dengan senter OFF. Bebas penalti 20 detik!" % snapped(auto_shutoff_threshold, 0.1))
 
-		# 2. Heat Warning (heat >= WARNING_HEAT): Kedip mati-nyala berkala
-		elif current_heat >= WARNING_HEAT:
+		# RESET SIKLUS: Begitu exposure menyentuh 0.0
+		if current_exposure <= 0.0:
+			current_exposure = 0.0
+			is_triggered = false
+			has_triggered_scream = false
+			current_spot_angle = base_spot_angle
+			flashlight.spot_angle = base_spot_angle
+			flashlight.spot_range = base_spot_range
+			current_light_energy = base_light_energy
+			flashlight.light_energy = base_light_energy
+
+			if has_penalty_lock:
+				# KONDISI A: Masa pengejaran selesai, tetapi MASIH TERKUNCI penalti 20 detik
+				is_flashlight_locked = true
+				print("[EXPOSURE] Masa pengejaran selesai (0.0)! Senter MASIH TERKUNCI PENALTI selama %s detik lagi." % snapped(penalty_lock_timer, 0.1))
+			else:
+				# KONDISI B: Bebas penalti / Aman! Senter bisa langsung digunakan normal
+				is_flashlight_locked = false
+				print("[EXPOSURE] Masa pengejaran selesai (0.0)! BEBAS PENALTI, senter langsung siap digunakan.")
+
+			if view_model and view_model.has_method("play_overheat_warning"):
+				view_model.play_overheat_warning(false)
+
+		# Clamp ketat untuk mencegah kebocoran nilai di luar batas normal
+		var min_allowed_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+		flashlight.spot_angle = clampf(flashlight.spot_angle, min_allowed_spot_angle, base_spot_angle)
+		current_spot_angle = clampf(current_spot_angle, min_allowed_spot_angle, base_spot_angle)
+		flashlight.light_energy = clampf(flashlight.light_energy, 0.0, base_light_energy)
+		current_light_energy = clampf(current_light_energy, 0.0, base_light_energy)
+		flashlight.spot_range = clampf(flashlight.spot_range, 0.0, base_spot_range)
+
+		_sync_outline_flashlight()
+
+		if view_model and view_model.has_method("update_flashlight_heat"):
+			view_model.update_flashlight_heat(current_exposure, max_exposure, is_flashlight_on, is_triggered)
+		return
+
+	# =========================================================================
+	# KONDISI 2: is_triggered == false (Normal & Fase Peringatan)
+	# =========================================================================
+	if is_flashlight_on:
+		current_exposure = minf(max_exposure, current_exposure + exposure_increase_rate * delta)
+
+		# 1. 0% - 50%: Area sorot senter normal penuh (100% ukuran) & terang normal
+		if current_exposure < dim_start_threshold:
+			current_spot_angle = base_spot_angle
+			flashlight.spot_angle = base_spot_angle
+			flashlight.spot_range = base_spot_range
+			flashlight.visible = true
+			flashlight.light_energy = base_light_energy
+			current_light_energy = base_light_energy
+			is_flicker_dark = false
+			flicker_timer = 0.0
+
+		# 2. 50% - 90%: Area sorot mengecil secara perlahan dan mulus (linear/lerp) tanpa flickering/pulsing
+		elif current_exposure < flicker_start_threshold:
+			var progress: float = clampf((current_exposure - dim_start_threshold) / (flicker_start_threshold - dim_start_threshold), 0.0, 1.0)
+			var min_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+			current_spot_angle = lerpf(base_spot_angle, min_spot_angle, progress)
+			flashlight.spot_angle = current_spot_angle
+			flashlight.spot_range = base_spot_range
+			flashlight.visible = true
+			flashlight.light_energy = base_light_energy
+			current_light_energy = base_light_energy
+			is_flicker_dark = false
+			flicker_timer = 0.0
+
+		# 3. 90% - 99%: Safe Flickering (Sorot sempit terkunci di min_spot_angle, flicker via spot_range / visible)
+		else:
+			var min_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+			current_spot_angle = min_spot_angle
+			flashlight.spot_angle = min_spot_angle
+
 			flicker_timer -= delta
 			if flicker_timer <= 0.0:
-				flicker_timer = randf_range(WARNING_INTERVAL_MIN, WARNING_INTERVAL_MAX)
+				is_flicker_dark = !is_flicker_dark
 				if is_flicker_dark:
-					is_flicker_dark = false
-					flashlight.visible = true
-					flashlight.light_energy = 1.0
-					if view_model and view_model.has_method("update_flashlight_visual"):
-						view_model.update_flashlight_visual(true)
+					flicker_timer = randf_range(0.04, 0.09)
 				else:
-					if randf() < 0.25:
-						is_flicker_dark = true
-						flashlight.visible = false
-						flashlight.light_energy = 0.0
-						flicker_timer = 0.05
-						if view_model and view_model.has_method("update_flashlight_visual"):
-							view_model.update_flashlight_visual(false)
+					flicker_timer = randf_range(0.06, 0.14)
 
-		# 3. Normal (heat < WARNING_HEAT): Stabil menyala (light_energy = 1.0)
-		else:
-			is_flicker_dark = false
-			flashlight.visible = true
-			flashlight.light_energy = 1.0
-			flicker_timer = 0.0
-			if view_model and view_model.has_method("update_flashlight_visual"):
-				view_model.update_flashlight_visual(true)
+			if is_flicker_dark:
+				flashlight.spot_range = 0.0
+				flashlight.light_energy = 0.0
+				flashlight.visible = false
+				current_light_energy = 0.0
+			else:
+				flashlight.spot_range = base_spot_range
+				flashlight.light_energy = base_light_energy
+				flashlight.visible = true
+				current_light_energy = base_light_energy
 
-		# 4. Overheated (heat >= MAX_HEAT)
-		if current_heat >= MAX_HEAT:
+		# 4. 100% (Trigger Point): Teriakan audio 1x, senter mati otomatis, aktifkan masa pengejaran
+		if current_exposure >= max_exposure:
 			_trigger_overheat()
 	else:
-		# 5. Recovery dengan Cooling Delay (Anti-Feathering)
-		if cooling_delay_timer > 0.0:
-			cooling_delay_timer -= delta
-		else:
-			current_heat = move_toward(current_heat, 0.0, COOL_RATE * delta)
+		# Senter OFF saat normal: exposure turun perlahan (normal_decrease_rate)
+		current_exposure = move_toward(current_exposure, 0.0, normal_decrease_rate * delta)
 		is_flicker_dark = false
 		flashlight.visible = false
-		flashlight.light_energy = 1.0
+		flashlight.light_energy = 0.0
+		current_light_energy = 0.0
+		flashlight.spot_range = base_spot_range
+		current_spot_angle = base_spot_angle
+		flashlight.spot_angle = base_spot_angle
 		flicker_timer = 0.0
 		if view_model and view_model.has_method("update_flashlight_visual"):
 			view_model.update_flashlight_visual(false)
 
+	# Pastikan nilai spot_angle, light_energy, dan spot_range tidak pernah bocor / melebihi batas aman
+	var min_allowed_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+	flashlight.spot_angle = clampf(flashlight.spot_angle, min_allowed_spot_angle, base_spot_angle)
+	current_spot_angle = clampf(current_spot_angle, min_allowed_spot_angle, base_spot_angle)
+	flashlight.light_energy = clampf(flashlight.light_energy, 0.0, base_light_energy)
+	current_light_energy = clampf(current_light_energy, 0.0, base_light_energy)
+	flashlight.spot_range = clampf(flashlight.spot_range, 0.0, base_spot_range)
+
+	_sync_outline_flashlight()
+
+	if view_model and view_model.has_method("update_flashlight_heat"):
+		view_model.update_flashlight_heat(current_exposure, max_exposure, is_flashlight_on, is_triggered)
+
 func _trigger_overheat() -> void:
-	current_heat = MAX_HEAT
-	is_overheated = true
+	current_exposure = max_exposure
+	is_triggered = true
+	has_penalty_lock = false
+	penalty_lock_timer = 0.0
+	is_flashlight_locked = false
+
+	# Matikan senter secara otomatis (ON -> OFF) tepat saat ter-trigger
 	is_flashlight_on = false
 	flashlight.visible = false
-	flashlight.light_energy = 1.0
+	flashlight.light_energy = 0.0
+	current_light_energy = 0.0
+	flashlight.spot_range = base_spot_range
 	is_flicker_dark = false
 	flicker_timer = 0.0
-	overheat_timer = OVERHEAT_COOLDOWN
-	print("Heat: 100.0 | OVERHEAT! Senter padam selama 4 detik.")
+	current_spot_angle = base_spot_angle * overheated_spot_angle_multiplier
+	flashlight.spot_angle = current_spot_angle
+	print("[TRIGGER] Exposure 100% | TRIGGERED! Senter padam otomatis & masuk masa pengejaran.")
+
+	# Putar audio trigger_scream.wav tepat 1 kali saja (anti-spam)
+	if not has_triggered_scream:
+		has_triggered_scream = true
+		if trigger_scream_player:
+			if trigger_scream_player.stream == null and trigger_scream_sound != null:
+				trigger_scream_player.stream = trigger_scream_sound
+			if trigger_scream_player.stream:
+				trigger_scream_player.play()
+				print("[AUDIO] trigger_scream.wav diputar (Trigger Point 100%)!")
+
+	_sync_outline_flashlight()
+
 	if view_model:
 		if view_model.has_method("update_flashlight_visual"):
 			view_model.update_flashlight_visual(false)
 		if view_model.has_method("play_overheat_warning"):
 			view_model.play_overheat_warning(true)
-	emit_signal("flashlight_exploded", global_position)
+		if view_model.has_method("update_flashlight_heat"):
+			view_model.update_flashlight_heat(current_exposure, max_exposure, false, true)
+	emit_signal("flashlight_exploded", global_position if is_inside_tree() else position)
 
 # ==============================================================================
 # SISTEM INTERAKSI OBJEK (WAJIB SENTER MENYALA)
@@ -647,7 +999,7 @@ func try_interact() -> void:
 				interact_target = target.owner
 
 		if interact_target.has_method("interact") or interact_target.is_in_group("interactable"):
-			if is_flashlight_on and not is_overheated:
+			if is_flashlight_on and flashlight.visible and flashlight.light_energy > 0.05:
 				if interact_target.has_method("interact"):
 					interact_target.interact(self)
 				else:
@@ -748,6 +1100,7 @@ func trigger_surface_tap() -> void:
 	active_max_radius = wall_tap_max_radius if hit_wall else floor_tap_max_radius
 
 	RenderingServer.global_shader_parameter_set("tap_origin", closest_hit_pos)
+	echolocation_made.emit(closest_hit_pos, active_max_radius)
 	_set_tap_radius(0.0)
 	current_tap_radius = 0.0
 	wave_timer = 0.0
@@ -814,6 +1167,9 @@ func handle_stamina(delta: float, is_moving: bool) -> void:
 		if is_exhausted and current_stamina >= exhaustion_recovery_threshold:
 			_clear_exhaustion()
 
+	if view_model and view_model.has_method("update_stamina_blur"):
+		view_model.update_stamina_blur(current_stamina, max_stamina, is_exhausted)
+
 func _trigger_exhaustion() -> void:
 	is_exhausted = true
 	is_sprinting = false
@@ -830,45 +1186,47 @@ func _trigger_exhaustion() -> void:
 		exhaustion_player.pitch_scale = randf_range(0.96, 1.04)
 		exhaustion_player.play()
 
-	if view_model and view_model.has_method("set_exhausted"):
-		view_model.set_exhausted(true)
+	if view_model:
+		if view_model.has_method("update_stamina_blur"):
+			view_model.update_stamina_blur(0.0, max_stamina, true)
+		elif view_model.has_method("set_exhausted"):
+			view_model.set_exhausted(true)
 
 	print("Stamina Habis! Terkena penalti lambat (exhausted).")
 
 func _clear_exhaustion() -> void:
 	is_exhausted = false
-	if view_model and view_model.has_method("set_exhausted"):
-		view_model.set_exhausted(false)
+	if view_model:
+		if view_model.has_method("update_stamina_blur"):
+			view_model.update_stamina_blur(current_stamina, max_stamina, false)
+		elif view_model.has_method("set_exhausted"):
+			view_model.set_exhausted(false)
 	print("Napas pulih kembali, siap sprint.")
 
 func handle_breathing_audio(delta: float, is_moving: bool) -> void:
 	if is_sprinting:
-		# Pastikan running breath menyala
+		sprint_audio_factor = minf(1.0, sprint_audio_factor + 3.0 * delta)
 		if running_breathing_player and not running_breathing_player.playing:
-			running_breathing_player.volume_db = run_breath_start_vol
+			running_breathing_player.volume_db = -60.0
 			running_breathing_player.play()
 
-		# Suara lari dimulai persis dari volume idle (tanpa cut/drop tiba-tiba)
-		# lalu semakin keras dan berat seiring habisnya stamina
 		var drain_ratio: float = 1.0 - clampf(current_stamina / max_stamina, 0.0, 1.0)
-		running_breath_target_vol = lerpf(run_breath_start_vol, run_breath_max_vol, drain_ratio)
+		var target_run_vol: float = lerpf(run_breath_start_vol, run_breath_max_vol, drain_ratio)
+		running_breath_target_vol = lerpf(-60.0, target_run_vol, sprint_audio_factor)
 		if running_breathing_player:
 			running_breathing_player.pitch_scale = lerpf(0.98, 1.08, drain_ratio)
 
-		# Idle breathing perlahan padam
-		idle_breath_target_vol = -80.0
+		idle_breath_target_vol = lerpf(idle_breath_volume_moving, -80.0, sprint_audio_factor)
 
 	elif is_exhausted:
-		# Selama exhausted, running breathing MATI TOTAL (tidak overlap)
+		sprint_audio_factor = maxf(0.0, sprint_audio_factor - 3.0 * delta)
 		running_breath_target_vol = -80.0
 		if running_breathing_player and running_breathing_player.playing:
 			running_breathing_player.stop()
 
-		# Selama suara out of breath masih berbunyi, idle breathing juga senyap
 		if exhaustion_player and exhaustion_player.playing:
 			idle_breath_target_vol = -80.0
 		else:
-			# Setelah suara out of breath selesai, napas santai perlahan masuk kembali seiring pemulihan
 			if idle_breathing_player and not idle_breathing_player.playing:
 				idle_breathing_player.volume_db = -80.0
 				idle_breathing_player.play()
@@ -876,21 +1234,120 @@ func handle_breathing_audio(delta: float, is_moving: bool) -> void:
 			idle_breath_target_vol = lerpf(-26.0, idle_breath_volume_still, recovery_progress)
 
 	else:
-		# Berhenti sprint: redam suara lari
+		sprint_audio_factor = maxf(0.0, sprint_audio_factor - 3.0 * delta)
 		running_breath_target_vol = -80.0
 		if running_breathing_player and running_breathing_player.volume_db <= -70.0 and running_breathing_player.playing:
 			running_breathing_player.stop()
 
-		# Nyalakan idle breath jika belum menyala
 		if idle_breathing_player and not idle_breathing_player.playing:
 			idle_breathing_player.volume_db = -80.0
 			idle_breathing_player.play()
 
-		# Volume santai: lebih pelan saat bergerak, sedikit lebih jelas saat diam
-		idle_breath_target_vol = idle_breath_volume_still if not is_moving else idle_breath_volume_moving
+		var calm_target: float = idle_breath_volume_still if not is_moving else idle_breath_volume_moving
+		idle_breath_target_vol = lerpf(calm_target, -80.0, sprint_audio_factor)
 
-	# Crossfade halus dengan lerp
 	if idle_breathing_player:
 		idle_breathing_player.volume_db = lerpf(idle_breathing_player.volume_db, idle_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))
 	if running_breathing_player:
 		running_breathing_player.volume_db = lerpf(running_breathing_player.volume_db, running_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))
+
+# ==============================================================================
+# JUMPSCARE & GAME OVER
+# ==============================================================================
+func trigger_jumpscare(monster_node: Node3D) -> void:
+	is_jumpscared = true
+	jumpscare_monster = monster_node
+	velocity = Vector3.ZERO
+	is_sprinting = false
+
+	# Hentikan detak jantung seketika agar tidak bertabrakan dengan audio jeritan
+	if heartbeat_player and heartbeat_player.playing:
+		heartbeat_player.stop()
+	beat_timer = 0.0
+
+	# Putar audio teriakan jumpscare jika belum berbunyi
+	if trigger_scream_player:
+		if trigger_scream_player.stream == null and trigger_scream_sound != null:
+			trigger_scream_player.stream = trigger_scream_sound
+		if trigger_scream_player.stream and not trigger_scream_player.playing:
+			trigger_scream_player.play()
+
+	# Pastikan cahaya senter menyala terang ke arah monster saat jumpscare
+	if flashlight:
+		flashlight.visible = true
+		flashlight.light_energy = maxf(flashlight.light_energy, 1.5)
+
+# ==============================================================================
+# SISTEM AUDIO DETAK JANTUNG (HEARTBEAT DYNAMICS)
+# ==============================================================================
+func handle_heartbeat_audio(delta: float) -> void:
+	# 1. Hentikan audio seketika saat jumpscare / tertangkap
+	if is_jumpscared:
+		if heartbeat_player and heartbeat_player.playing:
+			heartbeat_player.stop()
+		beat_timer = 0.0
+		return
+
+	# 2. Cari monster terdekat di dalam grup "monster"
+	var closest_monster: Node3D = _get_closest_monster()
+	if closest_monster == null or not is_inside_tree():
+		if heartbeat_player and heartbeat_player.playing:
+			heartbeat_player.stop()
+		beat_timer = 0.0
+		return
+
+	# 3. Hitung jarak 3D antara Player dan Monster
+	var dist: float = global_position.distance_to(closest_monster.global_position)
+
+	# 4. Di luar radius (distance > max_heartbeat_distance): hening total & reset timer
+	if dist > max_heartbeat_distance:
+		if heartbeat_player and heartbeat_player.playing:
+			heartbeat_player.stop()
+		beat_timer = 0.0
+		return
+
+	# 5. Di dalam radius: hitung rasio kedekatan t (0.0 pada max_dist, 1.0 pada min_dist)
+	var dist_range: float = max_heartbeat_distance - min_heartbeat_distance
+	var t: float = 0.0
+	if dist_range > 0.001:
+		t = clampf((max_heartbeat_distance - dist) / dist_range, 0.0, 1.0)
+	else:
+		t = 1.0 if dist <= min_heartbeat_distance else 0.0
+
+	# Interpolasi interval detak, volume, dan pitch
+	current_beat_interval = lerpf(slowest_beat_interval, fastest_beat_interval, t)
+	var target_vol: float = lerpf(min_heartbeat_volume_db, max_heartbeat_volume_db, t)
+	var target_pitch: float = lerpf(min_heartbeat_pitch, max_heartbeat_pitch, t)
+
+	if heartbeat_player:
+		heartbeat_player.volume_db = target_vol
+		heartbeat_player.pitch_scale = target_pitch
+
+	# 6. Timer manual pemotong jeda kosong audio (Gap Cutting)
+	# File heartbeat.wav berdurasi 1.0s tapi suara detak hanya ada di 0.0s - 0.4s.
+	# Timer manual memanggil play(0.0) tiap current_beat_interval tanpa menunggu stream selesai.
+	beat_timer += delta
+	if beat_timer >= current_beat_interval:
+		beat_timer = 0.0
+		if heartbeat_player:
+			if heartbeat_player.stream == null and heartbeat_sound != null:
+				heartbeat_player.stream = heartbeat_sound
+			if heartbeat_player.stream != null:
+				heartbeat_player.play(0.0)
+
+func _get_closest_monster() -> Node3D:
+	if not is_inside_tree() or get_tree() == null:
+		return null
+	var monsters := get_tree().get_nodes_in_group("monster")
+	if monsters.is_empty():
+		return null
+	var closest: Node3D = null
+	var min_dist: float = INF
+	var my_pos: Vector3 = global_position
+	for m in monsters:
+		if m is Node3D and is_instance_valid(m) and m.is_inside_tree():
+			var d: float = my_pos.distance_to(m.global_position)
+			if d < min_dist:
+				min_dist = d
+				closest = m
+	return closest
