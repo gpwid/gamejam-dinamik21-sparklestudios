@@ -119,10 +119,11 @@ const SWAY_SMOOTH_SPEED: float = 11.0
 @export_group("Stamina Dynamics")
 @export var max_stamina: float = 100.0
 @export var stamina_drain_rate: float = 11.0        # Habis dalam ~9.1 detik sprint terus-menerus (durasi diperpanjang)
+@export var hold_breath_drain_rate: float = 7.5     # Menguras stamina perlahan saat menahan napas
 @export var stamina_recovery_rate: float = 18.0     # Pulih penuh dalam ~5.5 detik
 @export var stamina_recovery_delay: float = 0.7     # Jeda setelah berhenti sprint sebelum mulai pulih
 @export var exhausted_walk_speed: float = 1.8       # Kecepatan melambat saat kehabisan napas (normal: 3.0)
-@export var exhaustion_recovery_threshold: float = 30.0 # Batas stamina pulih sebelum bisa sprint lagi
+@export var exhaustion_recovery_threshold: float = 25.0 # Batas stamina pulih minimal 25% sebelum bisa sprint/tahan napas lagi
 
 @export_group("Breathing Audio Levels")
 @export var idle_breath_volume_still: float = -14.0  # Suara napas santai diam (lembut dan tidak dominan)
@@ -133,6 +134,15 @@ const SWAY_SMOOTH_SPEED: float = 11.0
 var current_stamina: float = 100.0
 var is_exhausted: bool = false
 var stamina_recovery_timer: float = 0.0
+
+# Hold Breath & Proximity State
+var is_holding_breath: bool = false
+var has_shown_hold_breath_prompt: bool = false
+var lethal_zone_timer: float = 0.0
+var is_in_warning_zone: bool = false
+var fov_tween: Tween
+var exhaustion_fade_tween: Tween
+var cam_jolt_tween: Tween
 
 # Node References (Termasuk OutlinePass dari branch main!)
 @onready var head: Node3D = $Head
@@ -520,11 +530,21 @@ func _physics_process(delta: float) -> void:
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
 
-	var wants_to_sprint: bool = Input.is_action_pressed("sprint") and direction.length() > 0.1 and not is_sliding_on_wall
+	var is_moving_intent: bool = direction.length() > 0.1 and not is_sliding_on_wall
+	var wants_to_sprint: bool = Input.is_action_pressed("sprint") and is_moving_intent
 	if wants_to_sprint and not is_exhausted and current_stamina > 0.0:
 		is_sprinting = true
 	else:
 		is_sprinting = false
+
+	# Logika Kontekstual Tahan Napas (Shift saat diam dan tidak exhausted)
+	var wants_to_hold_breath: bool = Input.is_action_pressed("sprint") and not is_moving_intent and not is_exhausted and current_stamina > 0.0
+	if wants_to_hold_breath:
+		if not is_holding_breath:
+			_start_holding_breath()
+	else:
+		if is_holding_breath:
+			_stop_holding_breath()
 
 	var current_speed: float = WALK_SPEED
 	if is_sprinting:
@@ -591,6 +611,7 @@ func _physics_process(delta: float) -> void:
 	handle_tap_wave(delta)
 	handle_stamina(delta, horizontal_speed > 0.2)
 	handle_breathing_audio(delta, horizontal_speed > 0.2)
+	handle_monster_proximity_zones(delta, horizontal_speed)
 
 	_sync_outline_flashlight()
 		
@@ -599,8 +620,9 @@ func _physics_process(delta: float) -> void:
 # KAMERA & IMERSI FISIK
 # ==============================================================================
 func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed: float) -> void:
-	var target_fov: float = SPRINT_FOV if is_sprinting else base_fov
-	camera.fov = lerp(camera.fov, target_fov, FOV_TRANSITION_SPEED * delta)
+	if not is_holding_breath and (fov_tween == null or not fov_tween.is_valid()):
+		var target_fov: float = SPRINT_FOV if is_sprinting else base_fov
+		camera.fov = lerp(camera.fov, target_fov, FOV_TRANSITION_SPEED * delta)
 
 	var target_tilt: float = -input_dir.x * STRAFE_TILT_ANGLE
 	current_roll_tilt = lerp(current_roll_tilt, target_tilt, TILT_SPEED * delta)
@@ -1152,10 +1174,38 @@ func _init_breathing_audio() -> void:
 		)
 		running_breathing_player.play()
 
+func _start_holding_breath() -> void:
+	if is_holding_breath:
+		return
+	is_holding_breath = true
+	if fov_tween and fov_tween.is_valid():
+		fov_tween.kill()
+	fov_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	fov_tween.tween_property(camera, "fov", base_fov - 5.0, 0.28)
+
+	if not has_shown_hold_breath_prompt:
+		has_shown_hold_breath_prompt = true
+		if view_model and view_model.has_method("hide_hold_breath_prompt"):
+			view_model.hide_hold_breath_prompt()
+
+func _stop_holding_breath() -> void:
+	if not is_holding_breath:
+		return
+	is_holding_breath = false
+	if fov_tween and fov_tween.is_valid():
+		fov_tween.kill()
+	fov_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	fov_tween.tween_property(camera, "fov", base_fov, 0.35)
+
 func handle_stamina(delta: float, is_moving: bool) -> void:
 	if is_sprinting and is_moving:
 		stamina_recovery_timer = stamina_recovery_delay
 		current_stamina = maxf(0.0, current_stamina - stamina_drain_rate * delta)
+		if current_stamina <= 0.0 and not is_exhausted:
+			_trigger_exhaustion()
+	elif is_holding_breath:
+		stamina_recovery_timer = stamina_recovery_delay
+		current_stamina = maxf(0.0, current_stamina - hold_breath_drain_rate * delta)
 		if current_stamina <= 0.0 and not is_exhausted:
 			_trigger_exhaustion()
 	else:
@@ -1167,24 +1217,55 @@ func handle_stamina(delta: float, is_moving: bool) -> void:
 		if is_exhausted and current_stamina >= exhaustion_recovery_threshold:
 			_clear_exhaustion()
 
-	if view_model and view_model.has_method("update_stamina_blur"):
-		view_model.update_stamina_blur(current_stamina, max_stamina, is_exhausted)
+	if view_model:
+		if view_model.has_method("set_holding_breath"):
+			view_model.set_holding_breath(is_holding_breath, current_stamina / max_stamina)
+		if view_model.has_method("update_stamina_blur"):
+			view_model.update_stamina_blur(current_stamina, max_stamina, is_exhausted)
 
 func _trigger_exhaustion() -> void:
 	is_exhausted = true
 	is_sprinting = false
+	if is_holding_breath:
+		_stop_holding_breath()
 
-	# 1. Hentikan seketika suara lari agar TIDAK overlap dengan suara out of breath
+	# 1. Hentikan suara nafas lari & santai
 	running_breath_target_vol = -80.0
 	if running_breathing_player:
 		running_breathing_player.stop()
 		running_breathing_player.volume_db = -80.0
+	if idle_breathing_player:
+		idle_breathing_player.stop()
+		idle_breathing_player.volume_db = -80.0
 
-	# 2. Suara out of breath diputar tegas tanpa overlap
+	# 2. Putar audio gasping_for_air.wav dari detik 0.0 dengan volume jelas
 	if exhaustion_player:
-		exhaustion_player.volume_db = -3.0
-		exhaustion_player.pitch_scale = randf_range(0.96, 1.04)
-		exhaustion_player.play()
+		if exhaustion_fade_tween and exhaustion_fade_tween.is_valid():
+			exhaustion_fade_tween.kill()
+		exhaustion_player.volume_db = 0.0
+		exhaustion_player.pitch_scale = randf_range(0.97, 1.03)
+		exhaustion_player.play(0.0)
+
+		# Fade out setelah ~3.5 detik (durasi exhausted) lalu hentikan stream
+		exhaustion_fade_tween = create_tween()
+		exhaustion_fade_tween.tween_interval(3.5)
+		exhaustion_fade_tween.tween_property(exhaustion_player, "volume_db", -80.0, 0.8)
+		exhaustion_fade_tween.tween_callback(func():
+			if is_instance_valid(exhaustion_player) and exhaustion_player.playing:
+				exhaustion_player.stop()
+		)
+
+	# 3. Hentakan kamera ke bawah (camera pitch jolt)
+	if cam_jolt_tween and cam_jolt_tween.is_valid():
+		cam_jolt_tween.kill()
+	var base_cam_rot_x: float = camera.rotation.x
+	cam_jolt_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	cam_jolt_tween.tween_property(camera, "rotation:x", base_cam_rot_x - deg_to_rad(3.5), 0.12)
+	cam_jolt_tween.tween_property(camera, "rotation:x", base_cam_rot_x, 0.35).set_trans(Tween.TRANS_SINE)
+
+	# 4. Hentakan sprite tangan 2D ke bawah (ViewModel)
+	if view_model and view_model.has_method("play_exhaustion_jolt"):
+		view_model.play_exhaustion_jolt()
 
 	if view_model:
 		if view_model.has_method("update_stamina_blur"):
@@ -1192,7 +1273,15 @@ func _trigger_exhaustion() -> void:
 		elif view_model.has_method("set_exhausted"):
 			view_model.set_exhausted(true)
 
-	print("Stamina Habis! Terkena penalti lambat (exhausted).")
+	# 5. Deteksi yang Adil: Suara gasping hanya memicu kejar jika monster dekat (< 6.0m)
+	var closest_monster: Node3D = _get_closest_monster()
+	if closest_monster != null and is_inside_tree():
+		var dist_to_m: float = global_position.distance_to(closest_monster.global_position)
+		if dist_to_m < 6.0:
+			if closest_monster.has_method("trigger_close_gasp_chase"):
+				closest_monster.trigger_close_gasp_chase()
+
+	print("Stamina Habis! Terkena status Exhausted & nafas terengah-engah (gasping_for_air).")
 
 func _clear_exhaustion() -> void:
 	is_exhausted = false
@@ -1201,9 +1290,31 @@ func _clear_exhaustion() -> void:
 			view_model.update_stamina_blur(current_stamina, max_stamina, false)
 		elif view_model.has_method("set_exhausted"):
 			view_model.set_exhausted(false)
-	print("Napas pulih kembali, siap sprint.")
+
+	# Percepat fade-out gasping jika stamina sudah pulih
+	if exhaustion_player and exhaustion_player.playing:
+		if exhaustion_fade_tween and exhaustion_fade_tween.is_valid():
+			exhaustion_fade_tween.kill()
+		exhaustion_fade_tween = create_tween()
+		exhaustion_fade_tween.tween_property(exhaustion_player, "volume_db", -80.0, 0.4)
+		exhaustion_fade_tween.tween_callback(func():
+			if is_instance_valid(exhaustion_player) and exhaustion_player.playing:
+				exhaustion_player.stop()
+		)
+
+	print("Napas pulih kembali, siap sprint / tahan napas.")
 
 func handle_breathing_audio(delta: float, is_moving: bool) -> void:
+	if is_holding_breath:
+		# Saat menahan napas: suara nafas senyap total, menyisakan detak jantung
+		running_breath_target_vol = -80.0
+		idle_breath_target_vol = -80.0
+		if running_breathing_player and running_breathing_player.playing:
+			running_breathing_player.stop()
+		if idle_breathing_player and idle_breathing_player.playing:
+			idle_breathing_player.stop()
+		return
+
 	if is_sprinting:
 		sprint_audio_factor = minf(1.0, sprint_audio_factor + 3.0 * delta)
 		if running_breathing_player and not running_breathing_player.playing:
@@ -1250,6 +1361,66 @@ func handle_breathing_audio(delta: float, is_moving: bool) -> void:
 		idle_breathing_player.volume_db = lerpf(idle_breathing_player.volume_db, idle_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))
 	if running_breathing_player:
 		running_breathing_player.volume_db = lerpf(running_breathing_player.volume_db, running_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))
+
+func handle_monster_proximity_zones(delta: float, horizontal_speed: float) -> void:
+	if is_jumpscared:
+		return
+
+	var closest_monster: Node3D = _get_closest_monster()
+	if closest_monster == null or not is_inside_tree():
+		if is_in_warning_zone:
+			is_in_warning_zone = false
+			if view_model and view_model.has_method("set_warning_zone"):
+				view_model.set_warning_zone(false, 0.0)
+		lethal_zone_timer = 0.0
+		return
+
+	var dist: float = global_position.distance_to(closest_monster.global_position)
+
+	# 1. Zona Peringatan / Warning Zone (8.0m - 4.0m)
+	if dist <= 8.0 and dist >= 4.0:
+		is_in_warning_zone = true
+		var fear_intensity: float = clampf((8.0 - dist) / 4.0, 0.0, 1.0)
+		if view_model and view_model.has_method("set_warning_zone"):
+			view_model.set_warning_zone(true, fear_intensity)
+
+		# Onboarding Prompt minimalis pertama kali
+		if not has_shown_hold_breath_prompt:
+			if view_model and view_model.has_method("show_hold_breath_prompt"):
+				view_model.show_hold_breath_prompt()
+
+		# Efek kedipan statis tipis (interference flicker) pada cahaya senter
+		if is_flashlight_on and flashlight and not is_triggered:
+			if randf() < 0.22:
+				flashlight.light_energy = base_light_energy * randf_range(0.45, 0.82)
+			else:
+				flashlight.light_energy = base_light_energy
+	elif dist > 8.0:
+		if is_in_warning_zone:
+			is_in_warning_zone = false
+			if view_model and view_model.has_method("set_warning_zone"):
+				view_model.set_warning_zone(false, 0.0)
+		if is_flashlight_on and flashlight and not is_triggered and not is_flicker_dark:
+			flashlight.light_energy = base_light_energy
+	else:
+		# dist < 4.0m: di dalam lethal zone, tetap tampilkan visual fear maksimal
+		is_in_warning_zone = true
+		if view_model and view_model.has_method("set_warning_zone"):
+			view_model.set_warning_zone(true, 1.0)
+
+	# 2. Zona Bahaya / Lethal Hearing Zone (Jarak < 4.0m)
+	if dist < 4.0:
+		var is_stealth_safe: bool = is_holding_breath and not is_exhausted and horizontal_speed <= 0.2 and not is_flashlight_on
+		if not is_stealth_safe:
+			lethal_zone_timer += delta
+			if lethal_zone_timer >= 1.2:
+				lethal_zone_timer = 0.0
+				if closest_monster.has_method("trigger_lethal_hearing_chase"):
+					closest_monster.trigger_lethal_hearing_chase()
+		else:
+			lethal_zone_timer = 0.0
+	else:
+		lethal_zone_timer = 0.0
 
 # ==============================================================================
 # JUMPSCARE & GAME OVER
@@ -1334,6 +1505,8 @@ func handle_heartbeat_audio(delta: float) -> void:
 				heartbeat_player.stream = heartbeat_sound
 			if heartbeat_player.stream != null:
 				heartbeat_player.play(0.0)
+		if view_model and view_model.has_method("trigger_heartbeat_pulse"):
+			view_model.trigger_heartbeat_pulse()
 
 func _get_closest_monster() -> Node3D:
 	if not is_inside_tree() or get_tree() == null:

@@ -529,11 +529,28 @@ func trigger_overheat_chase() -> void:
 	if not has_screamed_chase:
 		_play_scream()
 		has_screamed_chase = true
+
+func trigger_close_gasp_chase() -> void:
+	if current_state == State.JUMPSCARE:
+		return
+	current_state = State.CHASE
+	chase_source = ChaseSource.DIRECT_SHINE
+	direct_chase_timer = direct_trigger_chase_duration
 	is_waiting = false
-	print("[MONSTER] CHASE AKTIF: Parameter senter overheat 100% (Kondisi A)!")
-	if not has_screamed_chase:
-		_play_scream()
-		has_screamed_chase = true
+	path_recalc_timer = 0.0
+	print("[MONSTER] CHASE AKTIF: Mendengar nafas ngos-ngosan / gasping pemain dari jarak dekat (<6m)!")
+	_play_scream()
+
+func trigger_lethal_hearing_chase() -> void:
+	if current_state == State.JUMPSCARE or current_state == State.CHASE:
+		return
+	current_state = State.CHASE
+	chase_source = ChaseSource.DIRECT_SHINE
+	direct_chase_timer = direct_trigger_chase_duration
+	is_waiting = false
+	path_recalc_timer = 0.0
+	print("[MONSTER] CHASE AKTIF: Mendeteksi suara/cahaya pemain di Lethal Hearing Zone (<4m)!")
+	_play_scream()
 
 # ==============================================================================
 # DETEKSI SOROT LANGSUNG SENTER (RAYCAST & CONE CHECK)
