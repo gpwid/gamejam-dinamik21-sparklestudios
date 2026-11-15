@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Game Jam Dinamika 21"
-run/main_scene="uid://d0se26gd7y5gw"
+run/main_scene="uid://wsxgmhmixqoe"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 

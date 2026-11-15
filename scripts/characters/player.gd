@@ -108,8 +108,8 @@ const SWAY_SMOOTH_SPEED: float = 11.0
 @export var min_heartbeat_distance: float = 2.5
 @export var slowest_beat_interval: float = 1.1
 @export var fastest_beat_interval: float = 0.38
-@export var min_heartbeat_volume_db: float = -18.0
-@export var max_heartbeat_volume_db: float = 1.0
+@export var min_heartbeat_volume_db: float = -10.0
+@export var max_heartbeat_volume_db: float = 7.0
 @export var min_heartbeat_pitch: float = 0.95
 @export var max_heartbeat_pitch: float = 1.1
 

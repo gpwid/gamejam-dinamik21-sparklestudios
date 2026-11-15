@@ -65,6 +65,11 @@ enum ChaseSource {
 
 @export_group("Audio")
 @export var scream_sound: AudioStream = preload("res://assets/audio/sfx/trigger_scream.wav")
+@export var footstep_sound: AudioStream = preload("res://assets/audio/sfx/monster_footstep.mp3")
+@export var footstep_max_distance: float = 12.0
+@export var patrol_step_interval: float = 0.88          # Tempo langkah santai saat patroli
+@export var investigate_step_interval: float = 0.70     # Tempo langkah waspada saat investigasi
+@export var chase_step_interval: float = 0.35           # Tempo langkah cepat saat mengejar (chase)
 
 # ==============================================================================
 # NODE REFERENCES
@@ -73,6 +78,7 @@ enum ChaseSource {
 @onready var sprite: Sprite3D = get_node_or_null("Sprite3D")
 @onready var collision_shape: CollisionShape3D = get_node_or_null("CollisionShape3D")
 @onready var scream_player: AudioStreamPlayer3D = get_node_or_null("ScreamPlayer")
+@onready var footstep_player: AudioStreamPlayer3D = get_node_or_null("FootstepPlayer")
 @onready var jumpscare_light: OmniLight3D = get_node_or_null("JumpscareLight")
 @onready var game_over_ui: CanvasLayer = get_node_or_null("GameOverUI")
 
@@ -88,6 +94,8 @@ var last_target_position: Vector3 = Vector3.INF
 var state_timer: float = 0.0
 var direct_chase_timer: float = 0.0
 var stuck_timer: float = 0.0
+var footstep_timer: float = 0.0
+var footstep_alt: bool = false
 var is_waiting: bool = false
 var has_screamed_chase: bool = false
 var current_waypoint_index: int = -1
@@ -223,16 +231,18 @@ func _setup_visual_material(tex: Texture2D) -> StandardMaterial3D:
 
 func _init_default_waypoints() -> void:
 	if patrol_waypoints.is_empty():
-		var y_lvl := global_position.y
-		patrol_waypoints = [
-			Vector3(-4.5, y_lvl, -4.5),
-			Vector3(4.5, y_lvl, -5.5),
-			Vector3(5.0, y_lvl, 2.0),
-			Vector3(0.0, y_lvl, 4.5),
-			Vector3(-5.0, y_lvl, 2.5),
-			Vector3(-2.0, y_lvl, -1.5),
-			Vector3(3.0, y_lvl, -1.5)
-		]
+		# Hanya isi waypoint bawaan jika berada di grid test_world kecil
+		if is_equal_approx(grid_bounds_min.x, -9.6) and is_equal_approx(grid_bounds_max.x, 9.6):
+			var y_lvl := global_position.y
+			patrol_waypoints = [
+				Vector3(-4.5, y_lvl, -4.5),
+				Vector3(4.5, y_lvl, -5.5),
+				Vector3(5.0, y_lvl, 2.0),
+				Vector3(0.0, y_lvl, 4.5),
+				Vector3(-5.0, y_lvl, 2.5),
+				Vector3(-2.0, y_lvl, -1.5),
+				Vector3(3.0, y_lvl, -1.5)
+			]
 
 func _init_audio() -> void:
 	if scream_player == null:
@@ -242,6 +252,18 @@ func _init_audio() -> void:
 		add_child(scream_player)
 	if scream_player.stream == null and scream_sound != null:
 		scream_player.stream = scream_sound
+
+	if footstep_player == null:
+		footstep_player = AudioStreamPlayer3D.new()
+		footstep_player.name = "FootstepPlayer"
+		footstep_player.transform.origin = Vector3(0.0, 0.2, 0.0)
+		footstep_player.max_distance = footstep_max_distance
+		footstep_player.unit_size = 2.0
+		footstep_player.max_polyphony = 2
+		footstep_player.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
+		add_child(footstep_player)
+	if footstep_player.stream == null and footstep_sound != null:
+		footstep_player.stream = footstep_sound
 
 func _find_player() -> void:
 	if not is_inside_tree() or get_tree() == null:
@@ -298,6 +320,8 @@ func _physics_process(delta: float) -> void:
 			_update_chase(delta)
 		State.JUMPSCARE:
 			_update_jumpscare(delta)
+
+	_update_footsteps(delta)
 
 # ==============================================================================
 # PATROL LOGIC
@@ -687,6 +711,10 @@ func reset_monster_visuals() -> void:
 		jumpscare_light.visible = false
 		jumpscare_light.light_energy = 0.0
 
+	if footstep_player and footstep_player.playing:
+		footstep_player.stop()
+	footstep_timer = 0.0
+
 func _get_active_material() -> StandardMaterial3D:
 	if mesh_instance and mesh_instance.material_override is StandardMaterial3D:
 		return mesh_instance.material_override as StandardMaterial3D
@@ -748,6 +776,8 @@ func scan_obstacles() -> void:
 				var collider = hits[0].collider
 				# Jangan tandai lantai horizontal sebagai obstacle
 				if collider is CSGBox3D and collider.name == "CSGBox3D":
+					continue
+				if collider.name == "Plane" or (collider.get_parent() and collider.get_parent().name.begins_with("Plane")):
 					continue
 				astar_grid.set_point_solid(Vector2i(gx, gz), true)
 				solid_count += 1
@@ -987,3 +1017,67 @@ func _play_scream() -> void:
 		if scream_player.stream and not scream_player.playing:
 			scream_player.pitch_scale = randf_range(0.94, 1.06)
 			scream_player.play()
+
+func _update_footsteps(delta: float) -> void:
+	if not footstep_player:
+		return
+
+	# Jangan bersuara jika sedang jumpscare atau sedang berhenti diam (waiting)
+	if current_state == State.JUMPSCARE or is_waiting:
+		if footstep_player.playing:
+			footstep_player.stop()
+		footstep_timer = 0.15
+		return
+
+	# Cek apakah monster benar-benar bergerak di atas lantai
+	var horiz_vel := Vector2(velocity.x, velocity.z).length()
+	var real_vel := get_real_velocity()
+	var real_speed := Vector2(real_vel.x, real_vel.z).length()
+
+	if not is_on_floor() or horiz_vel < 0.2 or real_speed < 0.1:
+		footstep_timer = 0.15
+		return
+
+	# Atur tempo langkah, pitch, dan volume berdasarkan status gerakan monster
+	var step_interval: float = patrol_step_interval
+	var pitch_min: float = 0.88
+	var pitch_max: float = 0.98
+	var vol_db: float = -2.0
+
+	match current_state:
+		State.CHASE:
+			step_interval = chase_step_interval
+			pitch_min = 1.15
+			pitch_max = 1.25
+			vol_db = 2.0
+		State.INVESTIGATE:
+			step_interval = investigate_step_interval
+			pitch_min = 0.96
+			pitch_max = 1.05
+			vol_db = 0.0
+		State.PATROL:
+			step_interval = patrol_step_interval
+			pitch_min = 0.88
+			pitch_max = 0.98
+			vol_db = -2.0
+
+	footstep_timer -= delta
+	if footstep_timer <= 0.0:
+		footstep_timer = step_interval
+		_trigger_monster_footstep(pitch_min, pitch_max, vol_db)
+
+func _trigger_monster_footstep(pitch_min: float, pitch_max: float, vol_db: float) -> void:
+	if not footstep_player or not footstep_player.is_inside_tree():
+		return
+	if footstep_player.stream == null and footstep_sound != null:
+		footstep_player.stream = footstep_sound
+	if footstep_player.stream == null:
+		return
+
+	footstep_player.volume_db = vol_db
+	footstep_player.pitch_scale = randf_range(pitch_min, pitch_max)
+
+	# Bergantian antara langkah kaki kiri (offset 0.0s) dan kanan (offset 2.38s)
+	footstep_alt = not footstep_alt
+	var offset: float = 0.0 if footstep_alt else 2.38
+	footstep_player.play(offset)

@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/characters/monster.gd" id="1_script"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/trigger_scream.wav" id="2_scream"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_over_ui.tscn" id="3_gameover"]
+[ext_resource type="AudioStream" uid="uid://c8uk7p858evqq" path="res://assets/audio/sfx/monster_footstep.mp3" id="4_footstep"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_monster"]
 radius = 0.45
@@ -26,6 +27,14 @@ mesh = SubResource("QuadMesh_monster")
 [node name="ScreamPlayer" type="AudioStreamPlayer3D" parent="."]
 stream = ExtResource("2_scream")
 max_distance = 50.0
+
+[node name="FootstepPlayer" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+stream = ExtResource("4_footstep")
+max_distance = 12.0
+unit_size = 2.0
+max_polyphony = 2
+doppler_tracking = 2
 
 [node name="JumpscareLight" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0.4)

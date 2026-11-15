@@ -23,8 +23,8 @@ func test_export_defaults() -> void:
 	assert(is_equal_approx(player.min_heartbeat_distance, 2.5), "min_heartbeat_distance should be 2.5")
 	assert(is_equal_approx(player.slowest_beat_interval, 1.1), "slowest_beat_interval should be 1.1")
 	assert(is_equal_approx(player.fastest_beat_interval, 0.38), "fastest_beat_interval should be 0.38")
-	assert(is_equal_approx(player.min_heartbeat_volume_db, -18.0), "min_heartbeat_volume_db should be -18.0")
-	assert(is_equal_approx(player.max_heartbeat_volume_db, 1.0), "max_heartbeat_volume_db should be 1.0")
+	assert(is_equal_approx(player.min_heartbeat_volume_db, -10.0), "min_heartbeat_volume_db should be -10.0")
+	assert(is_equal_approx(player.max_heartbeat_volume_db, 7.0), "max_heartbeat_volume_db should be 7.0")
 	assert(is_equal_approx(player.min_heartbeat_pitch, 0.95), "min_heartbeat_pitch should be 0.95")
 	assert(is_equal_approx(player.max_heartbeat_pitch, 1.1), "max_heartbeat_pitch should be 1.1")
 	assert(player.heartbeat_sound != null, "heartbeat_sound should be loaded")
@@ -77,24 +77,24 @@ func test_proximity_interpolation() -> void:
 	monster.global_position = Vector3(0.0, 0.0, 15.0)
 	player._process(0.016)
 	assert(is_equal_approx(player.current_beat_interval, 1.1), "At 15.0m interval should be 1.1s")
-	assert(is_equal_approx(player.heartbeat_player.volume_db, -18.0), "At 15.0m volume should be -18.0 dB")
+	assert(is_equal_approx(player.heartbeat_player.volume_db, -10.0), "At 15.0m volume should be -10.0 dB")
 	assert(is_equal_approx(player.heartbeat_player.pitch_scale, 0.95), "At 15.0m pitch should be 0.95")
 
 	# 2. Pada titik tengah (8.75m) -> t = 0.5
 	monster.global_position = Vector3(0.0, 0.0, 8.75)
 	player._process(0.016)
 	var expected_mid_interval: float = lerpf(1.1, 0.38, 0.5) # 0.74
-	var expected_mid_vol: float = lerpf(-18.0, 1.0, 0.5)      # -8.5
+	var expected_mid_vol: float = lerpf(-10.0, 7.0, 0.5)      # -1.5
 	var expected_mid_pitch: float = lerpf(0.95, 1.1, 0.5)     # 1.025
 	assert(abs(player.current_beat_interval - expected_mid_interval) < 0.01, "At 8.75m interval should be ~0.74s")
-	assert(abs(player.heartbeat_player.volume_db - expected_mid_vol) < 0.1, "At 8.75m volume should be ~ -8.5 dB")
+	assert(abs(player.heartbeat_player.volume_db - expected_mid_vol) < 0.1, "At 8.75m volume should be ~ -1.5 dB")
 	assert(abs(player.heartbeat_player.pitch_scale - expected_mid_pitch) < 0.01, "At 8.75m pitch should be ~1.025")
 
 	# 3. Pada jarak sangat dekat (2.5m atau kurang) -> t = 1.0
 	monster.global_position = Vector3(0.0, 0.0, 2.5)
 	player._process(0.016)
 	assert(is_equal_approx(player.current_beat_interval, 0.38), "At 2.5m interval should be 0.38s")
-	assert(is_equal_approx(player.heartbeat_player.volume_db, 1.0), "At 2.5m volume should be 1.0 dB")
+	assert(is_equal_approx(player.heartbeat_player.volume_db, 7.0), "At 2.5m volume should be 7.0 dB")
 	assert(is_equal_approx(player.heartbeat_player.pitch_scale, 1.1), "At 2.5m pitch should be 1.1")
 
 	print("PASS: Proximity interpolation smoothly scales tempo, volume, and pitch")
@@ -115,6 +115,7 @@ func test_custom_beat_timer_gap_cutting() -> void:
 	player.global_position = Vector3.ZERO
 	# Letakkan pada jarak 2.5m agar interval = 0.38s
 	monster.global_position = Vector3(0.0, 0.0, 2.5)
+	player.beat_timer = 0.0
 
 	# Tick 0.20s -> belum mencapai 0.38s, tidak boleh memicu beat
 	player._process(0.20)

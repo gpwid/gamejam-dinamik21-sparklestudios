@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://b6i7gouxxbdkv"
-path="res://.godot/imported/right_hand_echolocation.glb-b5e41d7bbab4b583135531d97f27b80a.scn"
+uid="uid://e0xv1yt0rod7"
+path="res://.godot/imported/map.glb-cdd7abf23afaa7d7c0af9c743b2332b6.scn"
 
 [deps]
 
-source_file="res://assets/3d/right_hand_echolocation.glb"
-dest_files=["res://.godot/imported/right_hand_echolocation.glb-b5e41d7bbab4b583135531d97f27b80a.scn"]
+source_file="res://assets/3d/map.glb"
+dest_files=["res://.godot/imported/map.glb-cdd7abf23afaa7d7c0af9c743b2332b6.scn"]
 
 [params]
 

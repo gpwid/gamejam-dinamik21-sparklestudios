@@ -1,11 +1,13 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cui_gameover01"]
 
 [ext_resource type="Script" path="res://scripts/ui/game_over_ui.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://dbyniyg8amri2" path="res://assets/fonts/HandymandiFree.ttf" id="2_font"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
-font_size = 56
+font = ExtResource("2_font")
+font_size = 76
 font_color = Color(0.9, 0.1, 0.1, 1)
-outline_size = 8
+outline_size = 12
 outline_color = Color(0, 0, 0, 1)
 
 [node name="GameOverUI" type="CanvasLayer"]
@@ -49,8 +51,9 @@ label_settings = SubResource("LabelSettings_title")
 horizontal_alignment = 1
 
 [node name="RetryButton" type="Button" parent="RootControl/CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(220, 50)
+custom_minimum_size = Vector2(240, 56)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 36
 text = "Ulangi"
