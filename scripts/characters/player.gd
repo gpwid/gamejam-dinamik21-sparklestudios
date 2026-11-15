@@ -1351,4 +1351,3 @@ func _get_closest_monster() -> Node3D:
 				min_dist = d
 				closest = m
 	return closest
-

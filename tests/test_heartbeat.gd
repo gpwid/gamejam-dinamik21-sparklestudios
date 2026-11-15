@@ -19,7 +19,7 @@ func test_export_defaults() -> void:
 	add_child(player)
 	await get_tree().process_frame
 
-	assert(is_equal_approx(player.max_heartbeat_distance, 7.5.0), "max_heartbeat_distance should be 7.5.0")
+	assert(is_equal_approx(player.max_heartbeat_distance, 15.0), "max_heartbeat_distance should be 15.0")
 	assert(is_equal_approx(player.min_heartbeat_distance, 2.5), "min_heartbeat_distance should be 2.5")
 	assert(is_equal_approx(player.slowest_beat_interval, 1.1), "slowest_beat_interval should be 1.1")
 	assert(is_equal_approx(player.fastest_beat_interval, 0.38), "fastest_beat_interval should be 0.38")
@@ -36,7 +36,7 @@ func test_export_defaults() -> void:
 	await get_tree().process_frame
 
 func test_outside_radius_silent() -> void:
-	print("\n[Test Heartbeat 2] Verify Silence Outside Radius (> 7.5.0m)")
+	print("\n[Test Heartbeat 2] Verify Silence Outside Radius (> 15.0m)")
 	var player_scene = load("res://scenes/characters/player.tscn")
 	var monster_scene = load("res://scenes/characters/monster.tscn")
 	var player = player_scene.instantiate()
@@ -45,7 +45,7 @@ func test_outside_radius_silent() -> void:
 	add_child(monster)
 	await get_tree().process_frame
 
-	# Jarak 20.0m (> max_heartbeat_distance 7.5.0m)
+	# Jarak 20.0m (> max_heartbeat_distance 15.0m)
 	player.global_position = Vector3(0.0, 0.0, 0.0)
 	monster.global_position = Vector3(0.0, 0.0, 20.0)
 
@@ -53,9 +53,9 @@ func test_outside_radius_silent() -> void:
 	for i in range(10):
 		player._process(0.1)
 
-	assert(not player.heartbeat_player.playing, "Heartbeat audio must not be playing when distance > 7.5.0m")
+	assert(not player.heartbeat_player.playing, "Heartbeat audio must not be playing when distance > 15.0m")
 	assert(is_equal_approx(player.beat_timer, 0.0), "Beat timer must be reset to 0.0 when outside radius")
-	print("PASS: Outside radius (> 7.5.0m) remains completely silent and timer resets")
+	print("PASS: Outside radius (> 15.0m) remains completely silent and timer resets")
 
 	player.queue_free()
 	monster.queue_free()
@@ -73,12 +73,12 @@ func test_proximity_interpolation() -> void:
 
 	player.global_position = Vector3.ZERO
 
-	# 1. Pada batas maksimal (7.5.0m) -> t = 0.0
-	monster.global_position = Vector3(0.0, 0.0, 7.5.0)
+	# 1. Pada batas maksimal (15.0m) -> t = 0.0
+	monster.global_position = Vector3(0.0, 0.0, 15.0)
 	player._process(0.016)
-	assert(is_equal_approx(player.current_beat_interval, 1.1), "At 7.5.0m interval should be 1.1s")
-	assert(is_equal_approx(player.heartbeat_player.volume_db, -18.0), "At 7.5.0m volume should be -18.0 dB")
-	assert(is_equal_approx(player.heartbeat_player.pitch_scale, 0.95), "At 7.5.0m pitch should be 0.95")
+	assert(is_equal_approx(player.current_beat_interval, 1.1), "At 15.0m interval should be 1.1s")
+	assert(is_equal_approx(player.heartbeat_player.volume_db, -18.0), "At 15.0m volume should be -18.0 dB")
+	assert(is_equal_approx(player.heartbeat_player.pitch_scale, 0.95), "At 15.0m pitch should be 0.95")
 
 	# 2. Pada titik tengah (8.75m) -> t = 0.5
 	monster.global_position = Vector3(0.0, 0.0, 8.75)
