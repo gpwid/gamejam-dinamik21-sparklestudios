@@ -1,0 +1,75 @@
+[gd_scene format=3 uid="uid://d3ppktg2jusvj"]
+
+[ext_resource type="Script" uid="uid://b08dl5v8roa6j" path="res://scripts/ui/main_menu.gd" id="1_script"]
+[ext_resource type="Material" uid="uid://bemel6bqisshu" path="res://assets/material/noirtoon_shader.tres" id="2_wall_mat"]
+[ext_resource type="PackedScene" uid="uid://bo3efpxuv5215" path="res://scenes/objects/monster.tscn" id="3_monster"]
+[ext_resource type="Material" uid="uid://ixibojbne03y" path="res://assets/material/noir_outline.tres" id="4_outline"]
+[ext_resource type="PackedScene" path="res://scenes/ui/main_menu_ui.tscn" id="5_ui"]
+
+[sub_resource type="Environment" id="Environment_menu"]
+background_mode = 1
+background_color = Color(0, 0, 0, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0, 0, 0, 1)
+tonemap_mode = 2
+
+[sub_resource type="QuadMesh" id="QuadMesh_outline"]
+size = Vector2(2, 2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wall"]
+albedo_color = Color(0.18, 0.18, 0.18, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall"]
+material = SubResource("StandardMaterial3D_wall")
+size = Vector3(14, 8, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.12, 0.12, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_floor"]
+material = SubResource("StandardMaterial3D_floor")
+size = Vector2(18, 18)
+
+[node name="MainMenu" type="Node3D" unique_id=1804050770]
+script = ExtResource("1_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1390278060]
+environment = SubResource("Environment_menu")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=254558602]
+transform = Transform3D(0.991445, 0.0182649, -0.129241, 0, 0.990268, 0.139887, 0.130526, -0.13869, 0.981798, 0.1, 1.35, 2.7)
+current = true
+fov = 56.0
+
+[node name="OutlinePass" type="MeshInstance3D" parent="Camera3D" unique_id=716573932]
+cast_shadow = 0
+extra_cull_margin = 16384.0
+ignore_occlusion_culling = true
+mesh = SubResource("QuadMesh_outline")
+surface_material_override/0 = ExtResource("4_outline")
+
+[node name="Stage3D" type="Node3D" parent="." unique_id=1167300963]
+
+[node name="BackWall" type="MeshInstance3D" parent="Stage3D" unique_id=1467734476]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 2.7, -1.7)
+material_override = ExtResource("2_wall_mat")
+mesh = SubResource("BoxMesh_wall")
+
+[node name="Floor" type="MeshInstance3D" parent="Stage3D" unique_id=435038561]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, 0)
+material_override = ExtResource("2_wall_mat")
+mesh = SubResource("PlaneMesh_floor")
+
+[node name="SpotLight" type="SpotLight3D" parent="Stage3D" unique_id=270054373]
+transform = Transform3D(0.60245293, -0.7864274, 0.13631725, 0.6258645, 0.57145625, 0.5307838, -0.49532226, -0.23445606, 0.83647245, 2.7, 3.4, 1.8)
+light_energy = 2.5
+shadow_enabled = true
+spot_range = 8.5
+spot_angle = 42.0
+
+[node name="Monster" parent="Stage3D" unique_id=627059564 instance=ExtResource("3_monster")]
+transform = Transform3D(-0.318788, 0, 0.0278905, 0, 0.32, 0, -0.0278905, 0, -0.318788, 2.30, -0.45000002, -0.25)
+
+[node name="UI" parent="." unique_id=1325013428 instance=ExtResource("5_ui")]

@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://drsn56y4hkgf4"]
+
+[ext_resource type="PackedScene" uid="uid://bbcofwaiol8ff" path="res://assets/3d/tv.glb" id="1_auwve"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_n1agy"]
+
+[node name="tv" unique_id=1112098541 instance=ExtResource("1_auwve")]
+
+[node name="Cube_010" parent="." index="0" unique_id=1699543710]
+material_override = ExtResource("2_n1agy")
+
+[node name="Cube_011" parent="Cube_010" index="0" unique_id=215787086]
+material_override = ExtResource("2_n1agy")
+
+[node name="Cube_017" parent="Cube_010" index="1" unique_id=450812397]
+material_override = ExtResource("2_n1agy")

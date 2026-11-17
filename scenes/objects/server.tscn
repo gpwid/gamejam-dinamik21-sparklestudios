@@ -1,0 +1,82 @@
+[gd_scene format=3 uid="uid://dk77ob8o0q5je"]
+
+[ext_resource type="PackedScene" uid="uid://cgjx7m4n5aorx" path="res://assets/3d/server.glb" id="1_mvspi"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_td1ey"]
+[ext_resource type="Material" uid="uid://cb5c0glass001" path="res://assets/material/noir_glass.tres" id="3_td1ey"]
+
+[node name="server" unique_id=885137909 instance=ExtResource("1_mvspi")]
+
+[node name="Cube_025" parent="." index="0" unique_id=2085100288]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_026" parent="." index="1" unique_id=1974792678]
+material_override = ExtResource("3_td1ey")
+
+[node name="Cube_028" parent="." index="2" unique_id=1971450020]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_029" parent="." index="3" unique_id=1419324251]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_031" parent="." index="4" unique_id=1718254345]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_032" parent="." index="5" unique_id=1126167817]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_034" parent="." index="6" unique_id=1341136316]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_035" parent="." index="7" unique_id=269164392]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_036" parent="." index="8" unique_id=1572105724]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_037" parent="." index="9" unique_id=1815334762]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_043" parent="." index="10" unique_id=1674574391]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_046" parent="." index="11" unique_id=820876836]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_047" parent="Cube_046" index="0" unique_id=299462874]
+material_override = ExtResource("2_td1ey")
+
+[node name="BézierCurve" parent="." index="12" unique_id=877840373]
+material_override = ExtResource("2_td1ey")
+
+[node name="BézierCurve_006" parent="." index="13" unique_id=1770924511]
+material_override = ExtResource("2_td1ey")
+
+[node name="BézierCurve_005" parent="." index="14" unique_id=1024701470]
+material_override = ExtResource("2_td1ey")
+
+[node name="BézierCurve_007" parent="." index="15" unique_id=606302662]
+material_override = ExtResource("2_td1ey")
+
+[node name="BézierCurve_008" parent="." index="16" unique_id=68727700]
+material_override = ExtResource("2_td1ey")
+
+[node name="BézierCurve_009" parent="." index="17" unique_id=1629280198]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cylinder_011" parent="." index="18" unique_id=861413988]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_041" parent="Cylinder_011" index="0" unique_id=994601427]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cylinder_015" parent="." index="19" unique_id=1484762809]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_042" parent="Cylinder_015" index="0" unique_id=498631747]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_045" parent="." index="20" unique_id=1322448954]
+material_override = ExtResource("2_td1ey")
+
+[node name="Cube_048" parent="." index="21" unique_id=654943802]
+material_override = ExtResource("2_td1ey")

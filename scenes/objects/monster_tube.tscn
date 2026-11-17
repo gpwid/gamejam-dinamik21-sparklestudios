@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://b82uj1tube001"]
+
+[ext_resource type="PackedScene" uid="uid://cj4t7mehi8nqh" path="res://assets/3d/monster_tube.glb" id="1_uruuy"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_ymnif"]
+[ext_resource type="Material" uid="uid://cb5c0glass001" path="res://assets/material/noir_glass.tres" id="3_3tbh3"]
+
+[node name="monster_tube" unique_id=1702722515 instance=ExtResource("1_uruuy")]
+
+[node name="Sphere" parent="." index="0" unique_id=1999670309]
+material_override = ExtResource("2_ymnif")
+
+[node name="Sphere_001" parent="Sphere" index="0" unique_id=810637922]
+material_override = ExtResource("3_3tbh3")

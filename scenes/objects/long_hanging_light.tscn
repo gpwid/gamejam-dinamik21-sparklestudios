@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://dckk3x1y56lv7"]
+
+[ext_resource type="PackedScene" uid="uid://bml4hvf1gs3mh" path="res://assets/3d/long_hanging_light.glb" id="1_tp0it"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_wtiug"]
+
+[node name="long_hanging_light" unique_id=557657555 instance=ExtResource("1_tp0it")]
+
+[node name="Cube_014" parent="." index="0" unique_id=161087739]
+material_override = ExtResource("2_wtiug")
+
+[node name="Cube_015" parent="Cube_014" index="0" unique_id=2009978684]
+material_override = ExtResource("2_wtiug")
+
+[node name="Cube_016" parent="Cube_014" index="1" unique_id=533705866]
+material_override = ExtResource("2_wtiug")
+
+[node name="Cylinder_006" parent="." index="1" unique_id=1241514078]
+material_override = ExtResource("2_wtiug")
+
+[node name="Cylinder_007" parent="Cylinder_006" index="0" unique_id=1857522292]
+material_override = ExtResource("2_wtiug")
+
+[node name="Cylinder_008" parent="." index="2" unique_id=1403554083]
+material_override = ExtResource("2_wtiug")
+
+[node name="Cylinder_009" parent="Cylinder_008" index="0" unique_id=492307064]
+material_override = ExtResource("2_wtiug")

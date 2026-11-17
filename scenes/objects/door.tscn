@@ -1,0 +1,101 @@
+[gd_scene format=3 uid="uid://b1u0gl7xd084h"]
+
+[ext_resource type="Script" path="res://scripts/objects/door.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://cgphgd2gawqcx" path="res://assets/3d/door.glb" id="1_uw3m6"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_xm0wp"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/switch.wav" id="3_sfx"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_block"]
+size = Vector3(18.4, 18.4, 1.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_escape"]
+size = Vector3(18.0, 18.0, 24.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_white"]
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+material = SubResource("StandardMaterial3D_white")
+size = Vector3(18.4, 0.5, 30.0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ceiling"]
+material = SubResource("StandardMaterial3D_white")
+size = Vector3(18.4, 0.5, 30.0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_side"]
+material = SubResource("StandardMaterial3D_white")
+size = Vector3(0.5, 18.4, 30.0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_back"]
+material = SubResource("StandardMaterial3D_white")
+size = Vector3(18.4, 18.4, 0.5)
+
+[node name="ExitDoor" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="door" parent="." instance=ExtResource("1_uw3m6")]
+
+[node name="Cylinder_014" parent="door" index="0"]
+material_override = ExtResource("2_xm0wp")
+
+[node name="Cube_019" parent="door/Cylinder_014" index="0"]
+material_override = ExtResource("2_xm0wp")
+
+[node name="Cube_020" parent="door" index="1"]
+material_override = ExtResource("2_xm0wp")
+
+[node name="Cylinder_013" parent="door/Cube_020" index="0"]
+material_override = ExtResource("2_xm0wp")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 0)
+shape = SubResource("BoxShape3D_block")
+
+[node name="EscapeTrigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 12)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="EscapeTrigger"]
+shape = SubResource("BoxShape3D_escape")
+
+[node name="LightRoom" type="Node3D" parent="."]
+
+[node name="Floor" type="MeshInstance3D" parent="LightRoom"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 15)
+mesh = SubResource("BoxMesh_floor")
+
+[node name="Ceiling" type="MeshInstance3D" parent="LightRoom"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18.65, 15)
+mesh = SubResource("BoxMesh_ceiling")
+
+[node name="WallLeft" type="MeshInstance3D" parent="LightRoom"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.2, 9.2, 15)
+mesh = SubResource("BoxMesh_wall_side")
+
+[node name="WallRight" type="MeshInstance3D" parent="LightRoom"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.2, 9.2, 15)
+mesh = SubResource("BoxMesh_wall_side")
+
+[node name="WallBack" type="MeshInstance3D" parent="LightRoom"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 30)
+mesh = SubResource("BoxMesh_back")
+
+[node name="ExitLight" type="SpotLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 0)
+visible = false
+light_color = Color(1, 0.98, 0.95, 1)
+light_energy = 0.0
+shadow_enabled = true
+shadow_bias = 0.05
+spot_range = 160.0
+spot_attenuation = 0.6
+spot_angle = 68.0
+spot_angle_attenuation = 1.0
+
+[node name="DoorOpenAudio" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("3_sfx")
+volume_db = 4.0
+pitch_scale = 0.65
+max_distance = 30.0

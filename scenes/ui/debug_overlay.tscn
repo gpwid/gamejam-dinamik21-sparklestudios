@@ -1,0 +1,100 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="1_script"]
+[ext_resource type="FontFile" path="res://assets/fonts/HandymandiFree.ttf" id="2_font"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.04, 0.04, 0.04, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.7)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+expand_margin_left = 8.0
+expand_margin_top = 8.0
+expand_margin_right = 8.0
+expand_margin_bottom = 8.0
+
+[node name="DebugOverlay" type="CanvasLayer"]
+layer = 120
+script = ExtResource("1_script")
+
+[node name="TopLeftMargin" type="MarginContainer" parent="."]
+visible = false
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 360.0
+offset_bottom = 180.0
+mouse_filter = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TopLeftMargin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="StatsPanel" type="PanelContainer" parent="TopLeftMargin/VBoxContainer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="VBoxStats" type="VBoxContainer" parent="TopLeftMargin/VBoxContainer/StatsPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="FpsLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "FPS: 60 (16.6 ms)"
+
+[node name="StateLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "STATE: PATROL"
+
+[node name="DistLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "JARAK: 0.0 m"
+
+[node name="LosLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "PANDANGAN: TERHALANG DINDING"
+
+[node name="TargetLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "TARGET: (0.0, 0.0) | PATH: 0 node"
+
+[node name="BreathLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "NAPAS: NORMAL (BERNAPAS)"
+
+[node name="HSeparator" type="HSeparator" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+
+[node name="HelpLabel" type="Label" parent="TopLeftMargin/VBoxContainer/StatsPanel/VBoxStats"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.85)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "[F4] AUTO-NYALAKAN SEMUA SAKLAR
+[F5] TELEPORT KE DEPAN EXIT DOOR"

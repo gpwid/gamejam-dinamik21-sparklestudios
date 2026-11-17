@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://c7nl2jl470hh"]
+
+[ext_resource type="PackedScene" uid="uid://b4b4xjtfi7iyx" path="res://assets/3d/rack.glb" id="1_56d4b"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_lhvbd"]
+
+[node name="rack" unique_id=2136648229 instance=ExtResource("1_56d4b")]
+
+[node name="Cube_001" parent="." index="0" unique_id=298489293]
+material_override = ExtResource("2_lhvbd")
+
+[node name="Cube_006" parent="Cube_001" index="0" unique_id=1843136728]
+material_override = ExtResource("2_lhvbd")
+
+[node name="Cube_007" parent="Cube_001" index="1" unique_id=392027030]
+material_override = ExtResource("2_lhvbd")

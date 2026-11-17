@@ -11,6 +11,10 @@ uniform float outline_width : hint_range(0.5, 3.0, 0.5) = 1.0;
 uniform float depth_edge_threshold : hint_range(0.01, 0.5, 0.005) = 0.08;
 uniform float normal_edge_threshold : hint_range(0.05, 1.0, 0.05) = 0.20;
 
+group_uniforms Comic_Edge_Wear;
+uniform bool enable_edge_wear = true;
+uniform float edge_wear_offset : hint_range(1.5, 6.0, 0.5) = 2.5;
+
 // Disinkronkan dari player.gd agar garis putih area gelap hanya muncul di dalam kerucut senter
 uniform bool flashlight_on = false;
 uniform vec3 flashlight_view_pos = vec3(0.3, -0.351, 0.0);
@@ -79,6 +83,7 @@ void fragment() {
 	float crease_y = 1.0 - dot(safe_normalize(p_c - p_u), safe_normalize(p_d - p_c));
 	float crease = max(crease_x, crease_y);
 	bool is_crease = (max_lap <= depth_edge_threshold) && (crease > normal_edge_threshold) && (d_c < 18.0);
+	bool is_primary_edge = (pos_lap > depth_edge_threshold || is_crease);
 
 	vec3 final_col = screen_col;
 	bool in_spot = false;
@@ -89,9 +94,37 @@ void fragment() {
 		in_spot = (dist <= flashlight_range) && (cone_dot >= flashlight_cos_angle - 0.02);
 	}
 
+	// Goresan & Garis Aksen Ganda yang Mengikuti Garis Sudut/Tepi Objek
+	bool is_accent_edge = false;
+	if (enable_edge_wear && !is_primary_edge && in_spot && lum_c > 0.15 && d_c < 14.0) {
+		vec2 px_accent = px * edge_wear_offset;
+		vec3 p_al = get_view_pos(clamp(uv - vec2(px_accent.x, 0.0), vec2(0.0), vec2(1.0)), INV_PROJECTION_MATRIX);
+		vec3 p_ar = get_view_pos(clamp(uv + vec2(px_accent.x, 0.0), vec2(0.0), vec2(1.0)), INV_PROJECTION_MATRIX);
+		vec3 p_au = get_view_pos(clamp(uv - vec2(0.0, px_accent.y), vec2(0.0), vec2(1.0)), INV_PROJECTION_MATRIX);
+		vec3 p_ad = get_view_pos(clamp(uv + vec2(0.0, px_accent.y), vec2(0.0), vec2(1.0)), INV_PROJECTION_MATRIX);
+
+		float c_ax = 1.0 - dot(safe_normalize(p_c - p_al), safe_normalize(p_ar - p_c));
+		float c_ay = 1.0 - dot(safe_normalize(p_c - p_au), safe_normalize(p_ad - p_c));
+		float d_al = max(-p_al.z, 0.01);
+		float d_ar = max(-p_ar.z, 0.01);
+		float d_au = max(-p_au.z, 0.01);
+		float d_ad = max(-p_ad.z, 0.01);
+		float lap_ax = max(d_c / d_al + d_c / d_ar - 2.0, 0.0);
+		float lap_ay = max(d_c / d_au + d_c / d_ad - 2.0, 0.0);
+
+		bool near_edge = (c_ax > normal_edge_threshold * 0.65 || c_ay > normal_edge_threshold * 0.65 || lap_ax > depth_edge_threshold * 0.75 || lap_ay > depth_edge_threshold * 0.75);
+		if (near_edge) {
+			vec3 w_pos = (INV_VIEW_MATRIX * vec4(p_c, 1.0)).xyz;
+			float stroke_coord = (c_ax > c_ay) ? (w_pos.y * 5.0 + w_pos.z * 1.5) : (w_pos.x * 5.0 + w_pos.z * 1.5);
+			// Garis putus-putus panjang (panjang 30-50cm dengan celah pendek khas inking komik)
+			float dash = step(0.15, sin(stroke_coord));
+			is_accent_edge = (dash > 0.5);
+		}
+	}
+
 	if (lum_c > 0.15) {
-		// Area terang di dalam senter: garis tepi siluet berwarna HITAM (sudut tajam objek sudah ditangani oleh material shader.gdshader)
-		if (in_spot && (pos_lap > depth_edge_threshold)) {
+		// Area terang di dalam senter: garis tepi siluet & garis aksen sudut 3D berwarna HITAM
+		if (in_spot && (is_primary_edge || is_accent_edge)) {
 			final_col = vec3(0.0);
 		}
 	} else {

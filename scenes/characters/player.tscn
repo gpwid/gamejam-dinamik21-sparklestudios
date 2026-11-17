@@ -31,6 +31,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
 [node name="Camera3D" type="Camera3D" parent="Head" unique_id=2034605404]
 
+[node name="AudioListener3D" type="AudioListener3D" parent="Head/Camera3D"]
+current = true
+
 [node name="OutlinePass" type="MeshInstance3D" parent="Head/Camera3D" unique_id=1982736451]
 visible = false
 cast_shadow = 0

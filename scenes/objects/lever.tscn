@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://2vqi7svb7fky"]
+
+[ext_resource type="PackedScene" uid="uid://dkca5q8ofi7u5" path="res://assets/3d/lever.glb" id="1_donkj"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_1gg2o"]
+
+[node name="lever" unique_id=1710657456 instance=ExtResource("1_donkj")]
+
+[node name="Cube_005" parent="." index="0" unique_id=1012548044]
+material_override = ExtResource("2_1gg2o")
+
+[node name="Cube" parent="Cube_005" index="0" unique_id=1726994653]
+material_override = ExtResource("2_1gg2o")

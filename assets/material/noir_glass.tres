@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://cb5c0glass001"]
+
+[ext_resource type="Shader" uid="uid://dsnte4e4whd8q" path="res://assets/material/noir_glass.gdshader" id="1_glass"]
+
+[resource]
+render_priority = 1
+shader = ExtResource("1_glass")
+shader_parameter/rim_power = 2.0
+shader_parameter/base_alpha = 0.18
+shader_parameter/highlight_strength = 1.0
+shader_parameter/outline_thickness = 0.22
+shader_parameter/enable_glass_wear = true
+shader_parameter/wear_density = 0.25
+shader_parameter/echo_intensity = 1.5

@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode ambient_light_disabled, specular_disabled;
+render_mode ambient_light_disabled, specular_disabled, cull_disabled;
 
 global uniform vec3 tap_origin;
 global uniform float tap_radius;
@@ -10,6 +10,12 @@ uniform bool use_floor_grid = true;
 uniform float grid_size = 1.5;
 uniform float hatch_threshold : hint_range(0.0, 0.5) = 0.12;
 uniform float hatch_scale : hint_range(0.1, 3.0) = 0.75;
+
+group_uniforms Comic_Wear;
+uniform bool enable_comic_wear = true;
+uniform float wear_scale : hint_range(0.5, 10.0) = 1.2;
+uniform float wear_density : hint_range(0.0, 1.0) = 0.15;
+uniform float wear_thickness : hint_range(0.005, 0.04) = 0.015;
 
 // --- PENGATURAN GELOMBANG GANDA (DOUBLE-RIPPLE DENGAN AFTERGLOW TRAIL) ---
 const float MAX_TAP_DISTANCE = 18.0;
@@ -24,14 +30,78 @@ void vertex() {
 	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
+vec2 hash22(vec2 p) {
+	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+	return fract(sin(p) * 43758.5453);
+}
+
+vec2 get_triplanar_uv(vec3 pos, vec3 norm) {
+	vec3 anorm = abs(norm);
+	if (anorm.y > anorm.x && anorm.y > anorm.z) {
+		return pos.xz;
+	} else if (anorm.x > anorm.z) {
+		return pos.yz;
+	}
+	return pos.xy;
+}
+
+float get_comic_scratches(vec2 p, float scale, float density, float thickness) {
+	vec2 cell_coord = p * scale;
+	vec2 cell_id = floor(cell_coord);
+	vec2 cell_uv = fract(cell_coord) - 0.5;
+	vec2 rnd = hash22(cell_id);
+
+	if (rnd.x > density) {
+		return 0.0;
+	}
+
+	float angle = (rnd.y - 0.5) * 2.6;
+	vec2 dir = vec2(cos(angle), sin(angle));
+	vec2 norm_dir = vec2(-dir.y, dir.x);
+
+	vec2 offset = (hash22(cell_id + vec2(13.7, 41.3)) - 0.5) * 0.35;
+	vec2 uv_o = cell_uv - offset;
+
+	float d_along = dot(uv_o, dir);
+	float d_perp = abs(dot(uv_o, norm_dir));
+	float len = 0.25 + rnd.x * 0.45;
+
+	// Goresan utama pena komik
+	float line1 = step(abs(d_along), len) * step(d_perp, thickness);
+
+	// Goresan sekunder pendek (// gaya goresan komik)
+	float line2 = 0.0;
+	if (rnd.y > 0.42) {
+		float gap = 0.032 + rnd.x * 0.018;
+		float len2 = len * (0.45 + rnd.y * 0.4);
+		float d2_along = d_along + (rnd.x - 0.5) * 0.08;
+		float d2_perp = abs(d_perp - gap);
+		line2 = step(abs(d2_along), len2) * step(d2_perp, thickness * 0.85);
+	}
+
+	// Coretan silang kecil (X) sesekali muncul
+	float cross_line = 0.0;
+	if (rnd.x < 0.08 * density) {
+		float c_angle = angle + 1.25;
+		vec2 c_dir = vec2(cos(c_angle), sin(c_angle));
+		vec2 c_norm = vec2(-c_dir.y, c_dir.x);
+		float c_along = dot(uv_o, c_dir);
+		float c_perp = abs(dot(uv_o, c_norm));
+		cross_line = step(abs(c_along), len * 0.55) * step(c_perp, thickness);
+	}
+
+	return clamp(line1 + line2 + cross_line, 0.0, 1.0);
+}
+
 float get_comic_lines(vec3 normal, vec3 view) {
 	// Hitung turunan screen-space di fragment() agar valid di gl_compatibility
 	vec3 normal_jump = fwidth(normal);
 	float normal_delta = length(normal_jump);
 	vec2 grid_deriv = max(fwidth(world_pos.xz / grid_size), vec2(0.0001));
 
-	// Deteksi apakah ini lantai datar di bawah
-	float is_flat_floor = step(0.95, abs(world_normal.y)) * step(world_pos.y, 0.35);
+	// Deteksi apakah ini lantai datar atau plafon ruangan
+	float is_ground_or_ceiling = step(2.6, world_pos.y) + (1.0 - step(0.25, world_pos.y));
+	float is_flat_floor = step(0.95, abs(world_normal.y)) * is_ground_or_ceiling;
 
 	// 1. Garis Siluet Pinggiran (Khusus permukaan lengkung agar bidang datar kubus tidak menghitam)
 	float is_curved = step(0.003, normal_delta);
@@ -41,7 +111,7 @@ float get_comic_lines(vec3 normal, vec3 view) {
 	// 2. Garis Siku Tajam (Hanya muncul di sudut patahan objek)
 	float hard_corner = step(0.12, normal_delta);
 
-	// 3. Garis Ubin Khusus Lantai
+	// 3. Garis Ubin Khusus Lantai & Plafon (Bukan Meja/Prop)
 	float floor_line = 0.0;
 	if (use_floor_grid && is_flat_floor > 0.5) {
 		vec2 grid = abs(fract(world_pos.xz / grid_size - 0.5) - 0.5) / grid_deriv;
@@ -75,6 +145,12 @@ void fragment() {
 	float ink = step(0.5, (tex.r + tex.g + tex.b) / 3.0);
 	if (comic_edge > 0.5) {
 		ink = 0.0;
+	} else if (enable_comic_wear) {
+		vec2 tri_uv = get_triplanar_uv(world_pos, world_normal);
+		float scratch = get_comic_scratches(tri_uv, wear_scale, wear_density, wear_thickness);
+		if (scratch > 0.5) {
+			ink = 0.0;
+		}
 	}
 	ALBEDO = vec3(ink);
 
@@ -108,8 +184,14 @@ void fragment() {
 }
 
 void light() {
-	float NdotL = max(dot(NORMAL, LIGHT), 0.0);
-	float in_light = step(0.05, ATTENUATION) * step(0.01, NdotL);
+	// Untuk bidang dua-sisi (seperti plafon/atap), balik normal jika cahaya datang dari arah belakang
+	vec3 n = NORMAL;
+	if (dot(n, LIGHT) < 0.0) {
+		n = -n;
+	}
+	float NdotL = max(dot(n, LIGHT), 0.0);
+	float light_intensity = max(LIGHT_COLOR.r, max(LIGHT_COLOR.g, LIGHT_COLOR.b));
+	float in_light = step(0.05, ATTENUATION) * step(0.01, NdotL) * step(0.01, light_intensity);
 
 	float lit_val = in_light;
 	// Arsir tinta tipis hanya pada bidang vertikal/lengkung yang menyerempet cahaya (bukan permukaan horizontal seperti meja/lantai)

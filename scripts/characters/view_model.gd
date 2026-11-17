@@ -17,7 +17,7 @@ class_name ViewModel
 @onready var left_hand_container: Control = get_node_or_null("LeftHandContainer")
 @onready var left_hand_texture: TextureRect = get_node_or_null("LeftHandContainer/LeftHandTexture")
 @onready var exhaustion_blur: ColorRect = get_node_or_null("ExhaustionVignette")
-@onready var prompt_label: Label = get_node_or_null("PromptLabel")
+@onready var reticle_node: Reticle = get_node_or_null("Reticle")
 
 var snap_tween: Tween
 var is_snapping: bool = false
@@ -25,7 +25,6 @@ var is_snapping: bool = false
 var click_tween: Tween
 var is_clicking: bool = false
 
-var prompt_tween: Tween
 var jolt_tween: Tween
 
 # Warna visualisasi senter
@@ -67,7 +66,6 @@ var hold_breath_stamina_ratio: float = 1.0
 var fear_tremor_intensity: float = 0.0
 var heartbeat_pulse: float = 0.0
 var current_static_intensity: float = 0.0
-var prompt_is_visible: bool = false
 
 func _ready() -> void:
 	if hand_texture:
@@ -81,9 +79,6 @@ func _ready() -> void:
 			left_hand_texture.texture = sprite_flashlight
 		_update_pivot()
 		left_hand_texture.resized.connect(_update_pivot)
-
-	if prompt_label:
-		prompt_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 
 	update_flashlight_visual(false)
 
@@ -153,15 +148,24 @@ func _process(delta: float) -> void:
 		var target_left_bob := Vector2(-target_bob.x, target_bob.y)
 		current_left_bob = current_left_bob.lerp(target_left_bob, clampf(10.0 * delta, 0.0, 1.0))
 	else:
-		# Saat menahan napas: idle bobbing beku/diam
-		current_bob = current_bob.lerp(Vector2.ZERO, clampf(10.0 * delta, 0.0, 1.0))
-		current_left_bob = current_left_bob.lerp(Vector2.ZERO, clampf(10.0 * delta, 0.0, 1.0))
+		# Saat menahan napas: idle bobbing beku total dan tangan ditarik rapat ke dalam & ke bawah (postur kaku/tegang)
+		var tense_right := Vector2(-8.0, 14.0)
+		var tense_left := Vector2(8.0, 14.0)
+		current_bob = current_bob.lerp(tense_right, clampf(12.0 * delta, 0.0, 1.0))
+		current_left_bob = current_left_bob.lerp(tense_left, clampf(12.0 * delta, 0.0, 1.0))
 
-	# 4. Fear Tremor Jitter (getaran ketakutan di zona peringatan atau saat stamina sekarat)
-	var tremor_amp: float = fear_tremor_intensity * 2.8
-	if is_holding_breath and hold_breath_stamina_ratio < 0.35:
-		var low_stam_factor: float = (0.35 - hold_breath_stamina_ratio) / 0.35
-		tremor_amp += low_stam_factor * 5.5
+	# 4. Fear Tremor Jitter (getaran ketakutan diegetik pada kedua tangan)
+	var tremor_amp: float = 0.0
+	if not is_holding_breath:
+		# Saat tidak tahan napas: tangan bergetar jelas seiring mendekatnya monster
+		tremor_amp = fear_tremor_intensity * 4.2
+	else:
+		# Saat menahan napas: getaran ketakutan ditekan sedikit agar terasa menahan diri
+		tremor_amp = fear_tremor_intensity * 1.5
+		# Ketika stamina menipis (< 35%), getaran kehabisan napas (asphyxiation) mengguncang tangan dengan keras
+		if hold_breath_stamina_ratio < 0.35:
+			var low_stam_factor: float = (0.35 - hold_breath_stamina_ratio) / 0.35
+			tremor_amp += low_stam_factor * 6.0
 
 	var jitter := Vector2.ZERO
 	if tremor_amp > 0.05:
@@ -215,29 +219,15 @@ func set_holding_breath(active: bool, stamina_ratio: float = 1.0) -> void:
 	is_holding_breath = active
 	hold_breath_stamina_ratio = stamina_ratio
 
+func update_stealth_hud(state: int, stamina_ratio: float = 1.0) -> void:
+	if is_instance_valid(reticle_node):
+		reticle_node.set_stealth_state(state as Reticle.StealthState, stamina_ratio)
+
 func set_warning_zone(active: bool, intensity: float) -> void:
 	fear_tremor_intensity = intensity if active else 0.0
 
 func trigger_heartbeat_pulse() -> void:
 	heartbeat_pulse = 1.0
-
-func show_hold_breath_prompt() -> void:
-	if not is_instance_valid(prompt_label) or prompt_is_visible:
-		return
-	prompt_is_visible = true
-	if prompt_tween and prompt_tween.is_valid():
-		prompt_tween.kill()
-	prompt_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	prompt_tween.tween_property(prompt_label, "modulate:a", 0.9, 0.45)
-
-func hide_hold_breath_prompt() -> void:
-	if not is_instance_valid(prompt_label) or not prompt_is_visible:
-		return
-	prompt_is_visible = false
-	if prompt_tween and prompt_tween.is_valid():
-		prompt_tween.kill()
-	prompt_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	prompt_tween.tween_property(prompt_label, "modulate:a", 0.0, 0.35)
 
 func play_exhaustion_jolt() -> void:
 	if jolt_tween and jolt_tween.is_valid():
@@ -391,3 +381,7 @@ func play_snap_animation(on_snap: Callable = Callable(), on_complete: Callable =
 		if on_complete.is_valid():
 			on_complete.call()
 	)
+
+func set_interactable_hover(hover: bool) -> void:
+	if reticle_node and reticle_node.has_method("set_interact_hover"):
+		reticle_node.set_interact_hover(hover)

@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://cfkhstto2hnak"]
+
+[ext_resource type="PackedScene" uid="uid://cqcxmvgtc8ds2" path="res://assets/3d/broken_tables.glb" id="1_4hxdk"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_my4py"]
+
+[node name="broken_tables" unique_id=218783234 instance=ExtResource("1_4hxdk")]
+
+[node name="Cube_012" parent="." index="0" unique_id=2138312926]
+surface_material_override/0 = ExtResource("2_my4py")
+
+[node name="Cube_018" parent="." index="1" unique_id=802882977]
+surface_material_override/0 = ExtResource("2_my4py")
+
+[node name="Cube_021" parent="." index="2" unique_id=468587122]
+surface_material_override/0 = ExtResource("2_my4py")

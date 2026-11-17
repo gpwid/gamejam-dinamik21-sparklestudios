@@ -119,7 +119,7 @@ const SWAY_SMOOTH_SPEED: float = 11.0
 @export_group("Stamina Dynamics")
 @export var max_stamina: float = 100.0
 @export var stamina_drain_rate: float = 11.0        # Habis dalam ~9.1 detik sprint terus-menerus (durasi diperpanjang)
-@export var hold_breath_drain_rate: float = 7.5     # Menguras stamina perlahan saat menahan napas
+@export var hold_breath_drain_rate: float = 5.0     # Menguras stamina perlahan saat menahan napas (~20 detik durasi)
 @export var stamina_recovery_rate: float = 18.0     # Pulih penuh dalam ~5.5 detik
 @export var stamina_recovery_delay: float = 0.7     # Jeda setelah berhenti sprint sebelum mulai pulih
 @export var exhausted_walk_speed: float = 1.8       # Kecepatan melambat saat kehabisan napas (normal: 3.0)
@@ -137,7 +137,9 @@ var stamina_recovery_timer: float = 0.0
 
 # Hold Breath & Proximity State
 var is_holding_breath: bool = false
-var has_shown_hold_breath_prompt: bool = false
+var was_in_stealth_danger: bool = false
+var was_closest_investigating: bool = false
+var safe_hud_timer: float = 0.0
 var lethal_zone_timer: float = 0.0
 var is_in_warning_zone: bool = false
 var fov_tween: Tween
@@ -304,6 +306,12 @@ signal flashlight_exploded(player_position: Vector3)
 signal footstep_stepped(is_sprint: bool)
 signal interaction_failed_in_dark()
 signal echolocation_made(sound_origin: Vector3, radius: float)
+signal onboarding_requested(type: String)
+
+var has_shown_spawn_hint: bool = false
+var has_shown_flashlight_hint: bool = false
+var has_shown_switch_hint: bool = false
+var has_shown_breath_hint: bool = false
 
 # Jumpscare State
 var is_jumpscared: bool = false
@@ -331,6 +339,12 @@ func _ready() -> void:
 		current_light_energy = base_light_energy
 	initial_camera_pos = camera.position
 	base_fov = camera.fov
+
+	get_tree().create_timer(0.6).timeout.connect(func():
+		if not has_shown_spawn_hint:
+			has_shown_spawn_hint = true
+			onboarding_requested.emit("spawn")
+	)
 	was_on_floor = is_on_floor()
 
 	_set_tap_radius(0.0)
@@ -512,7 +526,7 @@ func _physics_process(delta: float) -> void:
 			velocity += get_gravity() * delta
 		move_and_slide()
 		if is_instance_valid(jumpscare_monster):
-			var look_target := jumpscare_monster.global_position + Vector3(0.0, 1.2, 0.0)
+			var look_target := jumpscare_monster.global_position + Vector3(0.0, 2.2, 0.0)
 			var cam_pos := camera.global_position
 			var target_dir := (look_target - cam_pos).normalized()
 			if target_dir.length() > 0.01:
@@ -684,6 +698,7 @@ func handle_camera_immersion(delta: float, input_dir: Vector2, horizontal_speed:
 			view_model.set_idle(is_idle)
 
 	camera.position = initial_camera_pos + bob_offset + breath_offset + Vector3(0.0, landing_compression_y, 0.0)
+	_update_interact_hover()
 
 func _trigger_footstep(sprint: bool) -> void:
 	emit_signal("footstep_stepped", sprint)
@@ -705,7 +720,7 @@ func _trigger_footstep(sprint: bool) -> void:
 		if footstep_player.stream and footstep_player.is_inside_tree():
 			footstep_player.play()
 
-func _trigger_landing(impact_vel: float) -> void:
+func _trigger_landing(_impact_vel: float) -> void:
 	if landing_player:
 		landing_player.pitch_scale = randf_range(0.88, 1.08)
 		if landing_sound:
@@ -736,6 +751,7 @@ func handle_flashlight_heat(delta: float) -> void:
 	handle_flashlight_exposure(delta)
 
 func handle_flashlight_exposure(delta: float) -> void:
+	var min_allowed_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
 	# Hitung mundur penalti kunci 20 detik (jika terkena penalti Kondisi A)
 	if penalty_lock_timer > 0.0:
 		penalty_lock_timer = maxf(0.0, penalty_lock_timer - delta)
@@ -861,7 +877,7 @@ func handle_flashlight_exposure(delta: float) -> void:
 				view_model.play_overheat_warning(false)
 
 		# Clamp ketat untuk mencegah kebocoran nilai di luar batas normal
-		var min_allowed_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+		min_allowed_spot_angle = base_spot_angle * overheated_spot_angle_multiplier
 		flashlight.spot_angle = clampf(flashlight.spot_angle, min_allowed_spot_angle, base_spot_angle)
 		current_spot_angle = clampf(current_spot_angle, min_allowed_spot_angle, base_spot_angle)
 		flashlight.light_energy = clampf(flashlight.light_energy, 0.0, base_light_energy)
@@ -947,7 +963,7 @@ func handle_flashlight_exposure(delta: float) -> void:
 			view_model.update_flashlight_visual(false)
 
 	# Pastikan nilai spot_angle, light_energy, dan spot_range tidak pernah bocor / melebihi batas aman
-	var min_allowed_spot_angle: float = base_spot_angle * overheated_spot_angle_multiplier
+	min_allowed_spot_angle = base_spot_angle * overheated_spot_angle_multiplier
 	flashlight.spot_angle = clampf(flashlight.spot_angle, min_allowed_spot_angle, base_spot_angle)
 	current_spot_angle = clampf(current_spot_angle, min_allowed_spot_angle, base_spot_angle)
 	flashlight.light_energy = clampf(flashlight.light_energy, 0.0, base_light_energy)
@@ -1021,7 +1037,13 @@ func try_interact() -> void:
 				interact_target = target.owner
 
 		if interact_target.has_method("interact") or interact_target.is_in_group("interactable"):
-			if is_flashlight_on and flashlight.visible and flashlight.light_energy > 0.05:
+			var can_dark: bool = false
+			if interact_target.has_method("can_interact_in_dark"):
+				can_dark = interact_target.can_interact_in_dark()
+			elif interact_target.is_in_group("interact_in_dark"):
+				can_dark = true
+
+			if (is_flashlight_on and flashlight.visible and flashlight.light_energy > 0.05) or can_dark:
 				if interact_target.has_method("interact"):
 					interact_target.interact(self)
 				else:
@@ -1033,6 +1055,36 @@ func try_interact() -> void:
 					interact_target.interact_in_dark(self)
 				else:
 					print("Gelap gulita! Nyalakan senter untuk berinteraksi.")
+
+func _update_interact_hover() -> void:
+	if camera == null:
+		return
+	var space_state := get_world_3d().direct_space_state
+	var cam_from := camera.global_position
+	var cam_to := cam_from + (-camera.global_transform.basis.z * interact_distance)
+
+	var query := PhysicsRayQueryParameters3D.create(cam_from, cam_to)
+	query.exclude = [self.get_rid()]
+	var result := space_state.intersect_ray(query)
+
+	var is_hovering: bool = false
+	if result and result.has("collider") and result.collider:
+		var target: Node = result.collider
+		var interact_target: Node = target
+		if not (interact_target.has_method("interact") or interact_target.is_in_group("interactable")):
+			if target.get_parent() and (target.get_parent().has_method("interact") or target.get_parent().is_in_group("interactable")):
+				interact_target = target.get_parent()
+			elif target.owner and (target.owner.has_method("interact") or target.owner.is_in_group("interactable")):
+				interact_target = target.owner
+
+		if interact_target.has_method("interact") or interact_target.is_in_group("interactable"):
+			is_hovering = true
+			if interact_target.is_in_group("switch") and not has_shown_switch_hint:
+				has_shown_switch_hint = true
+				onboarding_requested.emit("switch")
+
+	if view_model and view_model.has_method("set_interactable_hover"):
+		view_model.set_interactable_hover(is_hovering)
 
 # ==============================================================================
 # GELOMBANG ECHOLOCATION (WALL-TAP VS FLOOR FALLBACK & COOLDOWN)
@@ -1123,6 +1175,13 @@ func trigger_surface_tap() -> void:
 
 	RenderingServer.global_shader_parameter_set("tap_origin", closest_hit_pos)
 	echolocation_made.emit(closest_hit_pos, active_max_radius)
+
+	if not has_shown_flashlight_hint:
+		has_shown_flashlight_hint = true
+		get_tree().create_timer(1.2).timeout.connect(func():
+			onboarding_requested.emit("flashlight")
+		)
+
 	_set_tap_radius(0.0)
 	current_tap_radius = 0.0
 	wave_timer = 0.0
@@ -1178,15 +1237,19 @@ func _start_holding_breath() -> void:
 	if is_holding_breath:
 		return
 	is_holding_breath = true
+	lethal_zone_timer = 0.0
 	if fov_tween and fov_tween.is_valid():
 		fov_tween.kill()
 	fov_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	fov_tween.tween_property(camera, "fov", base_fov - 5.0, 0.28)
-
-	if not has_shown_hold_breath_prompt:
-		has_shown_hold_breath_prompt = true
-		if view_model and view_model.has_method("hide_hold_breath_prompt"):
-			view_model.hide_hold_breath_prompt()
+	if view_model:
+		if view_model.has_method("set_holding_breath"):
+			view_model.set_holding_breath(true, current_stamina / max_stamina)
+		if view_model.has_method("update_stealth_hud"):
+			if is_in_warning_zone:
+				view_model.update_stealth_hud(2, current_stamina / max_stamina) # HOLDING_BREATH
+			else:
+				view_model.update_stealth_hud(4, current_stamina / max_stamina) # SAFE_HOLDING_BREATH
 
 func _stop_holding_breath() -> void:
 	if not is_holding_breath:
@@ -1196,6 +1259,16 @@ func _stop_holding_breath() -> void:
 		fov_tween.kill()
 	fov_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	fov_tween.tween_property(camera, "fov", base_fov, 0.35)
+	if view_model:
+		if view_model.has_method("set_holding_breath"):
+			view_model.set_holding_breath(false, current_stamina / max_stamina)
+		if view_model.has_method("update_stealth_hud"):
+			if safe_hud_timer > 0.0:
+				view_model.update_stealth_hud(3)
+			elif is_in_warning_zone:
+				view_model.update_stealth_hud(1)
+			else:
+				view_model.update_stealth_hud(0)
 
 func handle_stamina(delta: float, is_moving: bool) -> void:
 	if is_sprinting and is_moving:
@@ -1273,11 +1346,12 @@ func _trigger_exhaustion() -> void:
 		elif view_model.has_method("set_exhausted"):
 			view_model.set_exhausted(true)
 
-	# 5. Deteksi yang Adil: Suara gasping hanya memicu kejar jika monster dekat (< 6.0m)
+	# 5. Deteksi yang Adil: Suara gasping hanya memicu kejar jika monster dekat (< 6.0m di koridor sama, atau < 2.5m di balik dinding tipis)
 	var closest_monster: Node3D = _get_closest_monster()
 	if closest_monster != null and is_inside_tree():
 		var dist_to_m: float = global_position.distance_to(closest_monster.global_position)
-		if dist_to_m < 6.0:
+		var wall_blocked: bool = is_wall_blocking_to_monster(closest_monster)
+		if (not wall_blocked and dist_to_m < 6.0) or (wall_blocked and dist_to_m < 2.5):
 			if closest_monster.has_method("trigger_close_gasp_chase"):
 				closest_monster.trigger_close_gasp_chase()
 
@@ -1362,32 +1436,95 @@ func handle_breathing_audio(delta: float, is_moving: bool) -> void:
 	if running_breathing_player:
 		running_breathing_player.volume_db = lerpf(running_breathing_player.volume_db, running_breath_target_vol, clampf(4.0 * delta, 0.0, 1.0))
 
+func is_wall_blocking_to_monster(closest_monster: Node3D) -> bool:
+	if closest_monster == null or not is_inside_tree():
+		return true
+	var world_3d := get_world_3d()
+	if world_3d == null:
+		return true
+	var space_state := world_3d.direct_space_state
+	if space_state == null:
+		return true
+
+	var from_pos: Vector3 = camera.global_position if camera else (global_position + Vector3(0.0, 1.4, 0.0))
+	var to_pos: Vector3 = closest_monster.global_position + Vector3(0.0, 1.4, 0.0)
+
+	var query := PhysicsRayQueryParameters3D.create(from_pos, to_pos)
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	var excludes: Array[RID] = [get_rid()]
+	if closest_monster is CollisionObject3D:
+		excludes.append((closest_monster as CollisionObject3D).get_rid())
+	query.exclude = excludes
+
+	var hit := space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+
+	if hit.collider is StaticBody3D or hit.collider is CSGBox3D:
+		return true
+	return false
+
 func handle_monster_proximity_zones(delta: float, horizontal_speed: float) -> void:
 	if is_jumpscared:
 		return
 
 	var closest_monster: Node3D = _get_closest_monster()
 	if closest_monster == null or not is_inside_tree():
+		was_closest_investigating = false
 		if is_in_warning_zone:
 			is_in_warning_zone = false
 			if view_model and view_model.has_method("set_warning_zone"):
 				view_model.set_warning_zone(false, 0.0)
+		if was_in_stealth_danger:
+			was_in_stealth_danger = false
+			safe_hud_timer = 1.8
+
+		if safe_hud_timer > 0.0:
+			safe_hud_timer -= delta
+
+		if view_model and view_model.has_method("update_stealth_hud"):
+			if is_holding_breath:
+				view_model.update_stealth_hud(4, current_stamina / max_stamina) # SAFE_HOLDING_BREATH
+			elif safe_hud_timer > 0.0:
+				view_model.update_stealth_hud(3) # SAFE_TO_BREATHE
+			else:
+				view_model.update_stealth_hud(0) # NORMAL
 		lethal_zone_timer = 0.0
 		return
 
 	var dist: float = global_position.distance_to(closest_monster.global_position)
+	var is_wall_blocked: bool = is_wall_blocking_to_monster(closest_monster)
+	var is_monster_investigating: bool = closest_monster != null and "current_state" in closest_monster and closest_monster.current_state == 1
 
-	# 1. Zona Peringatan / Warning Zone (8.0m - 4.0m)
-	if dist <= 8.0 and dist >= 4.0:
+	# Deteksi instan saat monster selesai investigasi suara (sinkron dengan sfx monster_finish_investigating)
+	if was_closest_investigating and not is_monster_investigating:
+		safe_hud_timer = 1.8
+		was_in_stealth_danger = false
+	was_closest_investigating = is_monster_investigating
+
+	# 1. Indikator Bahaya Aktif (dengan Anti-Flicker Hysteresis):
+	# Aktif jika: monster di koridor terbuka, atau menempel dinding (< 1.8m), atau sedang investigasi suara (< 9.0m).
+	# Jika monster sedang investigasi suara pemain, peringatan langsung aktif seketika tanpa terhalang dinding!
+	var danger_dist_thresh: float = 9.0 if is_in_warning_zone else 8.5
+	var is_danger_active: bool = (dist <= danger_dist_thresh and not is_wall_blocked) or (dist < 1.8) or (is_monster_investigating and dist <= 11.0)
+
+	if is_danger_active:
+		was_in_stealth_danger = true
 		is_in_warning_zone = true
-		var fear_intensity: float = clampf((8.0 - dist) / 4.0, 0.0, 1.0)
+		safe_hud_timer = 0.0
+		var fear_intensity: float = clampf((9.0 - dist) / 4.5, 0.25, 1.0)
 		if view_model and view_model.has_method("set_warning_zone"):
 			view_model.set_warning_zone(true, fear_intensity)
 
-		# Onboarding Prompt minimalis pertama kali
-		if not has_shown_hold_breath_prompt:
-			if view_model and view_model.has_method("show_hold_breath_prompt"):
-				view_model.show_hold_breath_prompt()
+		if view_model and view_model.has_method("update_stealth_hud"):
+			if is_holding_breath:
+				view_model.update_stealth_hud(2, current_stamina / max_stamina) # HOLDING_BREATH (busur stamina berkurang)
+			else:
+				view_model.update_stealth_hud(1) # DANGER_INCOMING [ · ]
+				if not has_shown_breath_hint:
+					has_shown_breath_hint = true
+					onboarding_requested.emit("breath")
 
 		# Efek kedipan statis tipis (interference flicker) pada cahaya senter
 		if is_flashlight_on and flashlight and not is_triggered:
@@ -1395,21 +1532,35 @@ func handle_monster_proximity_zones(delta: float, horizontal_speed: float) -> vo
 				flashlight.light_energy = base_light_energy * randf_range(0.45, 0.82)
 			else:
 				flashlight.light_energy = base_light_energy
-	elif dist > 8.0:
-		if is_in_warning_zone:
-			is_in_warning_zone = false
-			if view_model and view_model.has_method("set_warning_zone"):
-				view_model.set_warning_zone(false, 0.0)
+	else:
+		is_in_warning_zone = false
+		if view_model and view_model.has_method("set_warning_zone"):
+			view_model.set_warning_zone(false, 0.0)
 		if is_flashlight_on and flashlight and not is_triggered and not is_flicker_dark:
 			flashlight.light_energy = base_light_energy
-	else:
-		# dist < 4.0m: di dalam lethal zone, tetap tampilkan visual fear maksimal
-		is_in_warning_zone = true
-		if view_model and view_model.has_method("set_warning_zone"):
-			view_model.set_warning_zone(true, 1.0)
 
-	# 2. Zona Bahaya / Lethal Hearing Zone (Jarak < 4.0m)
-	if dist < 4.0:
+		# Kondisi Aman untuk Melepas Shift: Monster sudah menjauh atau selesai investigasi
+		if was_in_stealth_danger:
+			was_in_stealth_danger = false
+			safe_hud_timer = 1.8 # Tampilkan sinyal aman selama 1.8 detik
+
+		if safe_hud_timer > 0.0:
+			safe_hud_timer -= delta
+
+		if view_model and view_model.has_method("update_stealth_hud"):
+			if is_holding_breath:
+				# Ketika monster sudah jauh / aman, walau masih nahan shift:
+				# Reticle berubah menjadi lingkaran bernapas utuh (SAFE_HOLDING_BREATH), alih-alih busur yang berkurang!
+				view_model.update_stealth_hud(4, current_stamina / max_stamina)
+			elif safe_hud_timer > 0.0:
+				view_model.update_stealth_hud(3) # SAFE_TO_BREATHE
+			else:
+				view_model.update_stealth_hud(0) # NORMAL
+
+	# 2. Zona Bahaya / Lethal Hearing Zone:
+	# Hanya mematikan jika monster berada di koridor terbuka (< 4.0m) ATAU menempel (< 1.8m).
+	# Jika terhalang dinding maze solid, monster TIDAK BISA mendengar napas tenang biasa!
+	if dist < 4.0 and (not is_wall_blocked or dist < 1.8):
 		var is_stealth_safe: bool = is_holding_breath and not is_exhausted and horizontal_speed <= 0.2 and not is_flashlight_on
 		if not is_stealth_safe:
 			lethal_zone_timer += delta
@@ -1489,6 +1640,12 @@ func handle_heartbeat_audio(delta: float) -> void:
 	current_beat_interval = lerpf(slowest_beat_interval, fastest_beat_interval, t)
 	var target_vol: float = lerpf(min_heartbeat_volume_db, max_heartbeat_volume_db, t)
 	var target_pitch: float = lerpf(min_heartbeat_pitch, max_heartbeat_pitch, t)
+
+	# Jika terhalang dinding tebal, redam volume detak jantung (suara muffled dari balik tembok)
+	var is_wall_blocked: bool = is_wall_blocking_to_monster(closest_monster)
+	if is_wall_blocked and dist > 2.0:
+		target_vol = clampf(target_vol - 8.0, min_heartbeat_volume_db, max_heartbeat_volume_db)
+		current_beat_interval = minf(current_beat_interval + 0.3, slowest_beat_interval)
 
 	if heartbeat_player:
 		heartbeat_player.volume_db = target_vol

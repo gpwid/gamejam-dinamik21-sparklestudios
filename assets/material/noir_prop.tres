@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://c8k2naprop001"]
+
+[ext_resource type="Shader" uid="uid://d0hcep24byfct" path="res://assets/material/shader.gdshader" id="1_shader"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/outline_thickness = 0.42
+shader_parameter/use_floor_grid = false
+shader_parameter/grid_size = 2.0
+shader_parameter/hatch_threshold = 0.0
+shader_parameter/hatch_scale = 0.75

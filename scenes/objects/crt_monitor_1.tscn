@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://by6coxsn2idew"]
+
+[ext_resource type="PackedScene" uid="uid://cnsnaynaxf8w" path="res://assets/3d/crt_monitor_1.glb" id="1_l5ghi"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_yk8cc"]
+
+[node name="crt_monitor_1" unique_id=957691925 instance=ExtResource("1_l5ghi")]
+
+[node name="Kubus_004" parent="." index="0" unique_id=564207257]
+material_override = ExtResource("2_yk8cc")
+
+[node name="Kubus_001" parent="Kubus_004" index="0" unique_id=23769404]
+material_override = ExtResource("2_yk8cc")

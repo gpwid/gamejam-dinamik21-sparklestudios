@@ -1,0 +1,20 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/material/noir_monster.gdshader" id="1_shader"]
+[ext_resource type="Material" path="res://assets/material/noir_monster_outline.tres" id="2_outline"]
+
+[resource]
+render_priority = 0
+next_pass = ExtResource("2_outline")
+shader = ExtResource("1_shader")
+shader_parameter/body_color = Color(1, 1, 1, 1)
+shader_parameter/is_face = true
+shader_parameter/eye_left = Vector2(0.31, 0.42)
+shader_parameter/eye_right = Vector2(0.64, 0.42)
+shader_parameter/eye_size = Vector2(0.045, 0.065)
+shader_parameter/eye_slant_deg = 15.0
+shader_parameter/socket_mult = 1.85
+shader_parameter/eye_color = Color(1, 1, 1, 1)
+shader_parameter/socket_color = Color(0, 0, 0, 1)
+shader_parameter/eye_glow = 4.5
+shader_parameter/pulse_speed = 2.2

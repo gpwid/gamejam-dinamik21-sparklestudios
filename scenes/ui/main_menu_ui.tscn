@@ -1,0 +1,962 @@
+[gd_scene format=3 uid="uid://de7itrdnwouw6"]
+
+[ext_resource type="Script" uid="uid://bd8gb455ow18d" path="res://scripts/ui/main_menu_ui.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://dbyniyg8amri2" path="res://assets/fonts/HandymandiFree.ttf" id="2_font"]
+[ext_resource type="Texture2D" uid="uid://d043tj2ravp3p" path="res://assets/ui/logo.png" id="3_logo"]
+[ext_resource type="Texture2D" uid="uid://b7coiaak8amae" path="res://assets/ui/ui_control_ellipse.png" id="4_ellipse"]
+[ext_resource type="Texture2D" uid="uid://bkrdppimvkcr8" path="res://assets/ui/ui_control_pill.png" id="5_pill"]
+[ext_resource type="AudioStream" uid="uid://cmnbvo1e2klnb" path="res://assets/audio/sfx/switch.wav" id="6_sfx"]
+[ext_resource type="Texture2D" uid="uid://deas1kyvvmuun" path="res://assets/ui/settings_modal.png" id="7_modal"]
+[ext_resource type="Texture2D" uid="uid://bmrt8yqq52sjl" path="res://assets/ui/ui_modal.png" id="8_ui_modal"]
+
+[sub_resource type="Gradient" id="Gradient_left_shade"]
+offsets = PackedFloat32Array(0, 0.45, 1)
+colors = PackedColorArray(0.02, 0.02, 0.02, 0.95, 0.02, 0.02, 0.02, 0.75, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_vignette"]
+gradient = SubResource("Gradient_left_shade")
+width = 512
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_btn_normal"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 14.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
+content_margin_left = 12.0
+content_margin_top = 4.0
+content_margin_right = 18.0
+content_margin_bottom = 4.0
+bg_color = Color(0.96, 0.96, 0.96, 1)
+shadow_color = Color(0.12, 0.12, 0.12, 0.9)
+shadow_size = 3
+shadow_offset = Vector2(3, 3)
+
+[node name="MainMenuUI" type="CanvasLayer" unique_id=621471958]
+layer = 10
+script = ExtResource("1_script")
+
+[node name="LeftGradient" type="TextureRect" parent="." unique_id=1705543265]
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 620.0
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_vignette")
+expand_mode = 1
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1662080003]
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 72.0
+offset_top = 54.0
+offset_right = 440.0
+offset_bottom = -54.0
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=2118319257]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Logo" type="TextureRect" parent="MarginContainer/VBoxContainer" unique_id=389124959]
+custom_minimum_size = Vector2(340, 210)
+layout_mode = 2
+texture = ExtResource("3_logo")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer" unique_id=1382370900]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="ButtonsVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=493768430]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NewGameBtn" type="Button" parent="MarginContainer/VBoxContainer/ButtonsVBox" unique_id=1312897251]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> NEW GAME"
+alignment = 0
+
+[node name="SettingsBtn" type="Button" parent="MarginContainer/VBoxContainer/ButtonsVBox" unique_id=1724718512]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> SETTINGS"
+alignment = 0
+
+[node name="CreditBtn" type="Button" parent="MarginContainer/VBoxContainer/ButtonsVBox" unique_id=1503102325]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> CREDIT"
+alignment = 0
+
+[node name="ExitBtn" type="Button" parent="MarginContainer/VBoxContainer/ButtonsVBox" unique_id=1060808740]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> EXIT"
+alignment = 0
+
+[node name="SettingsModal" type="Control" parent="." unique_id=1711167076]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dimmer" type="ColorRect" parent="SettingsModal" unique_id=28872692]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.65)
+
+[node name="Panel" type="Control" parent="SettingsModal" unique_id=611830926]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -215.0
+offset_right = 360.0
+offset_bottom = 215.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NinePatchRect" type="NinePatchRect" parent="SettingsModal/Panel" unique_id=61747766]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("7_modal")
+patch_margin_left = 35
+patch_margin_top = 84
+patch_margin_right = 35
+patch_margin_bottom = 35
+
+[node name="MarginContainer" type="MarginContainer" parent="SettingsModal/Panel" unique_id=732912649]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 38
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 38
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsModal/Panel/MarginContainer" unique_id=1316401958]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer" unique_id=208089870]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=1997021574]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 26
+text = "SETTINGS"
+horizontal_alignment = 1
+
+[node name="CloseBtn" type="Button" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=2130529832]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 0.3, 0.3, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+text = "X"
+
+[node name="LineSpacer" type="Control" parent="SettingsModal/Panel/MarginContainer/VBoxContainer" unique_id=1833001735]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+
+[node name="SlidersVBox" type="VBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer" unique_id=433142698]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="VolumeRow" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox" unique_id=2052259316]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/VolumeRow" unique_id=534590321]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "VOLUME"
+
+[node name="VolumeSlider" type="HSlider" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/VolumeRow" unique_id=1364515315]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+focus_mode = 0
+value = 80.0
+
+[node name="VolumeVal" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/VolumeRow" unique_id=591956206]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+text = "80%"
+horizontal_alignment = 2
+
+[node name="BrightnessRow" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox" unique_id=102291827]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/BrightnessRow" unique_id=166216382]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "BRIGHTNESS"
+
+[node name="BrightnessSlider" type="HSlider" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/BrightnessRow" unique_id=1396502826]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+focus_mode = 0
+value = 50.0
+
+[node name="BrightnessVal" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/BrightnessRow" unique_id=1958174783]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+text = "50%"
+horizontal_alignment = 2
+
+[node name="SensitivityRow" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox" unique_id=819173491]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/SensitivityRow" unique_id=723680251]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "SENSITIVITY"
+
+[node name="SensitivitySlider" type="HSlider" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/SensitivityRow" unique_id=705926987]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+focus_mode = 0
+min_value = 5.0
+value = 50.0
+
+[node name="SensitivityVal" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/SensitivityRow" unique_id=995187740]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+text = "50%"
+horizontal_alignment = 2
+
+[node name="MidSpacer" type="Control" parent="SettingsModal/Panel/MarginContainer/VBoxContainer" unique_id=1947520182]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="ControlsVBox" type="VBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer" unique_id=99231892]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ControlsTitle" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox" unique_id=1391534244]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "KONTROL & TOOLTIP"
+
+[node name="ControlsGrid" type="GridContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox" unique_id=1267978662]
+layout_mode = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="ControlMove" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid" unique_id=1549039895]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Badge" type="TextureRect" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlMove" unique_id=1623780226]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("5_pill")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BadgeLbl" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlMove/Badge" unique_id=1578968183]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "WASD"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Text" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlMove" unique_id=947073804]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Gerak (Move)"
+
+[node name="ControlShift" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid" unique_id=858425184]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Badge" type="TextureRect" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlShift" unique_id=445084069]
+custom_minimum_size = Vector2(62, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("5_pill")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BadgeLbl" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlShift/Badge" unique_id=1758158792]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "SHIFT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Text" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlShift" unique_id=650960256]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Tahan Napas / Sprint"
+
+[node name="ControlF" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid" unique_id=2070450765]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Badge" type="TextureRect" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlF" unique_id=2062478857]
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_ellipse")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BadgeLbl" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlF/Badge" unique_id=1666078949]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "F"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Text" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlF" unique_id=99125872]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Senter (Flashlight)"
+
+[node name="ControlTap" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid" unique_id=1246894701]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Badge" type="TextureRect" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlTap" unique_id=1167577334]
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_ellipse")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BadgeLbl" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlTap/Badge" unique_id=122227470]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Q"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Text" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlTap" unique_id=1697442673]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Echolocation / Tap"
+
+[node name="ControlInteract" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid" unique_id=1224433262]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Badge" type="TextureRect" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlInteract" unique_id=562750835]
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_ellipse")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BadgeLbl" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlInteract/Badge" unique_id=171290414]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "E"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Text" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlInteract" unique_id=322744269]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Nyalakan Saklar"
+
+[node name="ControlPause" type="HBoxContainer" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid" unique_id=721742306]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Badge" type="TextureRect" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlPause" unique_id=643101533]
+custom_minimum_size = Vector2(48, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("5_pill")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BadgeLbl" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlPause/Badge" unique_id=1474643404]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "ESC"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Text" type="Label" parent="SettingsModal/Panel/MarginContainer/VBoxContainer/ControlsVBox/ControlsGrid/ControlPause" unique_id=2008668330]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Jeda / Menu (Pause)"
+
+[node name="CreditsModal" type="Control" parent="." unique_id=1253486996]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dimmer" type="ColorRect" parent="CreditsModal" unique_id=2134704606]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.25)
+
+[node name="Panel" type="Control" parent="CreditsModal" unique_id=352612491]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -13.0
+offset_top = -189.0
+offset_right = 484.0
+offset_bottom = 211.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NinePatchRect" type="NinePatchRect" parent="CreditsModal/Panel" unique_id=1704391316]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("8_ui_modal")
+patch_margin_left = 35
+patch_margin_top = 35
+patch_margin_right = 35
+patch_margin_bottom = 35
+
+[node name="MarginContainer" type="MarginContainer" parent="CreditsModal/Panel" unique_id=931921204]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 24
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CreditsModal/Panel/MarginContainer" unique_id=1940958132]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Header" type="HBoxContainer" parent="CreditsModal/Panel/MarginContainer/VBoxContainer" unique_id=1973636035]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CreditsModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=1161197793]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 23
+text = "CREDITS"
+horizontal_alignment = 1
+
+[node name="CreditsCloseBtn" type="Button" parent="CreditsModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=1532094367]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+text = "X"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CreditsModal/Panel/MarginContainer/VBoxContainer" unique_id=1895045917]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="CreditsContent" type="VBoxContainer" parent="CreditsModal/Panel/MarginContainer/VBoxContainer/ScrollContainer" unique_id=509378490]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="CreditsText" type="Label" parent="CreditsModal/Panel/MarginContainer/VBoxContainer/ScrollContainer/CreditsContent" unique_id=1422837414]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+theme_override_constants/line_spacing = 4
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Developed by:
+SPARKLE STUDIOS
+
+Gusti Panji Widodo: Lead Game Designer & Programmer
+Zidan Rey Nugraha: Lead UI/UX Designer & Creative Director
+Tengku Farah Nabila Syah: Lead 3D Artist & Level Designer
+Zhidan Iannov Saaba: Programmer & Systems Designer
+Muhammad Nabil Alfathan: 3D Artist & UI Designer
+
+Made for Game Dev Dinamik 21
+
+-- ASSETS CREDIT --
+Font : Handymandi Free Font: by Narehop
+
+Sound Effects (via Freesound.org):
+Player SFX: Jovica, inspectorJ, saha213131, Jacdutcit, SoundBitterSFX, .name, DavidJohnson2019, deleted_user_5093904
+Monster & World SFX: Bikit69, Taira Komori, arnaud coutancier, MSFxPtaph, SpankMyFifth, Setoradion, Autobot8299, chungus43A
+
+Music & Ambience (via Pixabay Music):
+\"Lost In Corruption\", \"No Welcome\", \"Leave\" by lesfm
+
+All third-party audio assets are used under Creative Commons & Royalty-Free licenses. No Generative AI assets were used in this project."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ExitConfirmModal" type="Control" parent="." unique_id=1492606652]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dimmer" type="ColorRect" parent="ExitConfirmModal" unique_id=757530902]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.65)
+
+[node name="Panel" type="Control" parent="ExitConfirmModal" unique_id=1751800801]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -115.0
+offset_right = 230.0
+offset_bottom = 115.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NinePatchRect" type="NinePatchRect" parent="ExitConfirmModal/Panel" unique_id=1665291841]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("8_ui_modal")
+patch_margin_left = 35
+patch_margin_top = 35
+patch_margin_right = 35
+patch_margin_bottom = 35
+
+[node name="MarginContainer" type="MarginContainer" parent="ExitConfirmModal/Panel" unique_id=486785781]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 24
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ExitConfirmModal/Panel/MarginContainer" unique_id=1753135169]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Header" type="HBoxContainer" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer" unique_id=461656935]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=1059611110]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 23
+text = "KELUAR PERMAINAN"
+horizontal_alignment = 1
+
+[node name="ExitCloseBtn" type="Button" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=2023099414]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+text = "X"
+
+[node name="Question" type="Label" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer" unique_id=1468565296]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "Apakah anda yakin ingin keluar?"
+horizontal_alignment = 1
+
+[node name="BtnRow" type="HBoxContainer" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer" unique_id=67709312]
+layout_mode = 2
+theme_override_constants/separation = 36
+alignment = 1
+
+[node name="ExitYesBtn" type="Button" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer/BtnRow" unique_id=1766299072]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> YA"
+
+[node name="ExitNoBtn" type="Button" parent="ExitConfirmModal/Panel/MarginContainer/VBoxContainer/BtnRow" unique_id=1935945416]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> BATAL"
+
+[node name="DifficultyModal" type="Control" parent="." unique_id=1028834618]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dimmer" type="ColorRect" parent="DifficultyModal" unique_id=1495701962]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.25)
+
+[node name="Panel" type="Control" parent="DifficultyModal" unique_id=100107517]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 24.0
+offset_top = -189.0
+offset_right = 434.0
+offset_bottom = 181.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NinePatchRect" type="NinePatchRect" parent="DifficultyModal/Panel" unique_id=155755950]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("8_ui_modal")
+patch_margin_left = 35
+patch_margin_top = 35
+patch_margin_right = 35
+patch_margin_bottom = 35
+
+[node name="MarginContainer" type="MarginContainer" parent="DifficultyModal/Panel" unique_id=1950565271]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="VBoxContainer" type="VBoxContainer" parent="DifficultyModal/Panel/MarginContainer" unique_id=2122325614]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer" unique_id=2058520176]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="Title" type="Label" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=1276387766]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 23
+text = "PILIH KESULITAN"
+horizontal_alignment = 1
+
+[node name="DiffCloseBtn" type="Button" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer/Header" unique_id=840399330]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+text = "X"
+
+[node name="Subtitle" type="Label" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer" unique_id=1224765315]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "Pilihlah dengan bijak..."
+horizontal_alignment = 1
+
+[node name="DiffButtonsVBox" type="VBoxContainer" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer" unique_id=730754654]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EasyBtn" type="Button" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer/DiffButtonsVBox" unique_id=1736434174]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> EASY"
+alignment = 0
+
+[node name="NormalBtn" type="Button" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer/DiffButtonsVBox" unique_id=275402080]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> NORMAL"
+alignment = 0
+
+[node name="HardBtn" type="Button" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer/DiffButtonsVBox" unique_id=321415670]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> HARD "
+alignment = 0
+
+[node name="ExtremeBtn" type="Button" parent="DifficultyModal/Panel/MarginContainer/VBoxContainer/DiffButtonsVBox" unique_id=2133349172]
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_focus_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_btn_hover")
+text = "> EXTREME "
+alignment = 0
+
+[node name="FadeRect" type="ColorRect" parent="." unique_id=941571742]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="UiSfx" type="AudioStreamPlayer" parent="." unique_id=830056411]
+stream = ExtResource("6_sfx")
+volume_db = -6.0

@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://cndbwj5jcl2iw"]
+
+[ext_resource type="PackedScene" uid="uid://dofnw6xickyve" path="res://assets/3d/bar_dor.glb" id="1_vs1sl"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_lft06"]
+
+[node name="bar_dor" unique_id=1083985969 instance=ExtResource("1_vs1sl")]
+
+[node name="Cylinder_010" parent="." index="0" unique_id=1281765143]
+material_override = ExtResource("2_lft06")
+
+[node name="Cylinder_011" parent="Cylinder_010" index="0" unique_id=722716825]
+material_override = ExtResource("2_lft06")

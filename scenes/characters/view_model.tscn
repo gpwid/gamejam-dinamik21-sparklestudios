@@ -5,7 +5,6 @@
 [ext_resource type="Script" uid="uid://bxrentakmumd0" path="res://scripts/ui/reticle.gd" id="3_reticle"]
 [ext_resource type="Shader" uid="uid://b773s2f7yf53h" path="res://assets/material/vignette.gdshader" id="4_vignette"]
 [ext_resource type="Texture2D" uid="uid://cuk31jjd4ml47" path="res://assets/sprites/lefthand_flashlight.png" id="5_lefthand"]
-[ext_resource type="FontFile" uid="uid://dbyniyg8amri2" path="res://assets/fonts/HandymandiFree.ttf" id="6_font"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_vig"]
 shader = ExtResource("4_vignette")
@@ -78,29 +77,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-
-[node name="PromptLabel" type="Label" parent="." unique_id=89218301]
-modulate = Color(1, 1, 1, 0)
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -250.0
-offset_top = -140.0
-offset_right = 250.0
-offset_bottom = -100.0
-grow_horizontal = 2
-grow_vertical = 0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 0.9)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 4
-theme_override_fonts/font = ExtResource("6_font")
-theme_override_font_sizes/font_size = 22
-text = "[Diam + Tahan SHIFT] Tahan Napas"
-horizontal_alignment = 1
-vertical_alignment = 1
 
 [node name="Reticle" type="Control" parent="." unique_id=654341579]
 layout_mode = 3

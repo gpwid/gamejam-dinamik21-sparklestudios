@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://c4vygpvu70j8h"]
+
+[ext_resource type="PackedScene" uid="uid://c6lqwpfauyynu" path="res://assets/3d/cupboard.glb" id="1_keq02"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_0qucp"]
+
+[node name="cupboard" unique_id=2036825598 instance=ExtResource("1_keq02")]
+
+[node name="Cube_009" parent="." index="0" unique_id=1499345724]
+surface_material_override/0 = ExtResource("2_0qucp")

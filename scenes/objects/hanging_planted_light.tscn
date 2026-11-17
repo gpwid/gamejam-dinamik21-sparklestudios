@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://cwmvteqvcckuh"]
+
+[ext_resource type="PackedScene" uid="uid://chmxmxp8to515" path="res://assets/3d/hanging_planted_light.glb" id="1_on485"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_vxl1u"]
+
+[node name="hanging_planted_light" unique_id=1600651869 instance=ExtResource("1_on485")]
+
+[node name="Cube_014" parent="." index="0" unique_id=148917674]
+material_override = ExtResource("2_vxl1u")
+
+[node name="Cube_015" parent="Cube_014" index="0" unique_id=504062033]
+material_override = ExtResource("2_vxl1u")
+
+[node name="Cube_016" parent="Cube_014" index="1" unique_id=1383967704]
+material_override = ExtResource("2_vxl1u")

@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://dr0gq5mt8vdny"]
+
+[ext_resource type="Script" path="res://scripts/objects/switch.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://bkvsljkp107ow" path="res://assets/3d/switch.glb" id="1_a1pya"]
+[ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_bxjfm"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/electrical_hum.wav" id="3_hum"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/lever_pull.wav" id="4_pull"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_switch"]
+size = Vector3(2.8, 3.3, 2.6)
+
+[node name="FacilitySwitch" type="StaticBody3D" groups=["interact_in_dark", "interactable", "switch"]]
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.1, 0.7)
+shape = SubResource("BoxShape3D_switch")
+
+[node name="switch" parent="." instance=ExtResource("1_a1pya")]
+
+[node name="BézierCurve_002" parent="switch" index="0"]
+material_override = ExtResource("2_bxjfm")
+
+[node name="BézierCurve_001" parent="switch/BézierCurve_002" index="0"]
+material_override = ExtResource("2_bxjfm")
+
+[node name="HumPlayer" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("3_hum")
+volume_db = -6.0
+max_distance = 9.0
+attenuation_filter_cutoff_hz = 5000.0
+
+[node name="SwitchPlayer" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("4_pull")
+volume_db = 0.0
+max_distance = 18.0
