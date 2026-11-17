@@ -3,6 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://rl5xqtqsnyjk" path="res://assets/3d/bed.glb" id="1_jx3i1"]
 [ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_g5a0r"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_bed"]
+size = Vector3(13.941, 8.169, 6.024)
+
 [node name="bed" unique_id=1579445209 instance=ExtResource("1_jx3i1")]
 
 [node name="Cube_004" parent="." index="0" unique_id=2121531818]
@@ -10,3 +13,9 @@ material_override = ExtResource("2_g5a0r")
 
 [node name="Cube_008" parent="Cube_004" index="0" unique_id=501997064]
 material_override = ExtResource("2_g5a0r")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." index="1"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.354, 4.085, 0.098)
+shape = SubResource("BoxShape3D_bed")

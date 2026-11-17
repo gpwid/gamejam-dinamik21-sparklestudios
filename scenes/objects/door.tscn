@@ -11,6 +11,15 @@ size = Vector3(18.4, 18.4, 1.6)
 [sub_resource type="BoxShape3D" id="BoxShape3D_escape"]
 size = Vector3(18.0, 18.0, 24.0)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_lr_floor"]
+size = Vector3(18.4, 0.5, 30.0)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lr_wall_side"]
+size = Vector3(0.5, 18.4, 30.0)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lr_wall_back"]
+size = Vector3(18.4, 18.4, 0.5)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_white"]
 shading_mode = 0
 albedo_color = Color(1, 1, 1, 1)
@@ -81,6 +90,24 @@ mesh = SubResource("BoxMesh_wall_side")
 [node name="WallBack" type="MeshInstance3D" parent="LightRoom"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 30)
 mesh = SubResource("BoxMesh_back")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="LightRoom"]
+
+[node name="FloorCollision" type="CollisionShape3D" parent="LightRoom/StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 15)
+shape = SubResource("BoxShape3D_lr_floor")
+
+[node name="WallLeftCollision" type="CollisionShape3D" parent="LightRoom/StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.2, 9.2, 15)
+shape = SubResource("BoxShape3D_lr_wall_side")
+
+[node name="WallRightCollision" type="CollisionShape3D" parent="LightRoom/StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.2, 9.2, 15)
+shape = SubResource("BoxShape3D_lr_wall_side")
+
+[node name="WallBackCollision" type="CollisionShape3D" parent="LightRoom/StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 30)
+shape = SubResource("BoxShape3D_lr_wall_back")
 
 [node name="ExitLight" type="SpotLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.2, 0)

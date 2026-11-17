@@ -4,6 +4,9 @@
 [ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_td1ey"]
 [ext_resource type="Material" uid="uid://cb5c0glass001" path="res://assets/material/noir_glass.tres" id="3_td1ey"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_server"]
+size = Vector3(12.5, 34.0, 10.4)
+
 [node name="server" unique_id=885137909 instance=ExtResource("1_mvspi")]
 
 [node name="Cube_025" parent="." index="0" unique_id=2085100288]
@@ -80,3 +83,9 @@ material_override = ExtResource("2_td1ey")
 
 [node name="Cube_048" parent="." index="21" unique_id=654943802]
 material_override = ExtResource("2_td1ey")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." index="22"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16.85, 0)
+shape = SubResource("BoxShape3D_server")

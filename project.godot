@@ -8,21 +8,21 @@
 
 config_version=5
 
-[autoload]
-
-GameManager="*res://scripts/core/game_manager.gd"
-
 [application]
-boot_splash/bg_color=Color(0, 0, 0, 1)
 
 config/name="Game Jam Dinamika 21"
 run/main_scene="res://scenes/ui/splash_screen.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0, 0, 0, 1)
 config/icon="res://icon.svg"
 
 [audio]
 
 buses/default_bus_layout="uid://dwxguudplrav4"
+
+[autoload]
+
+GameManager="*res://scripts/core/game_manager.gd"
 
 [display]
 
@@ -83,11 +83,11 @@ interact={
 3d/physics_engine="Jolt Physics"
 
 [rendering]
-environment/defaults/default_clear_color=Color(0, 0, 0, 1)
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0, 0, 0, 1)
 
 [shader_globals]
 

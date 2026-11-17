@@ -3,7 +3,16 @@
 [ext_resource type="PackedScene" uid="uid://n2c7lrl4f6o5" path="res://assets/3d/chair.glb" id="1_r1c1s"]
 [ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_pmpg8"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_chair"]
+size = Vector3(3.389, 7.202, 3.169)
+
 [node name="chair" unique_id=1057015720 instance=ExtResource("1_r1c1s")]
 
 [node name="Cube_003" parent="." index="0" unique_id=1696787383]
 material_override = ExtResource("2_pmpg8")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." index="1"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.112, 2.535, 0.123)
+shape = SubResource("BoxShape3D_chair")
