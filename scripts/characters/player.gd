@@ -8,6 +8,7 @@ const SPRINT_SPEED: float = 6.0
 const ACCELERATION: float = 25.0
 const DECELERATION: float = 25.0
 const AIR_CONTROL_FACTOR: float = 0.25 # Reduksi kontrol udara saat melayang
+@export var mouse_sensitivity: float = 0.003
 const MOUSE_SENSITIVITY: float = 0.003
 const WALL_STOP_THRESHOLD: float = 0.82  # Tabrakan < ~35 derajat dari tegak lurus = berhenti total
 const WALL_SLIDE_SPEED_MULT: float = 0.6 # Kecepatan merayap saat sliding miring di tembok
@@ -409,8 +410,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mouse_x: float = event.relative.x
 		var mouse_y: float = event.relative.y
 
-		rotate_y(-mouse_x * MOUSE_SENSITIVITY)
-		head.rotate_x(-mouse_y * MOUSE_SENSITIVITY)
+		rotate_y(-mouse_x * mouse_sensitivity)
+		head.rotate_x(-mouse_y * mouse_sensitivity)
 		head.rotation.x = clamp(head.rotation.x, deg_to_rad(-80), deg_to_rad(80))
 
 		mouse_input_accumulator.x += mouse_x
