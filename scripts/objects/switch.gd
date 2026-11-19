@@ -18,11 +18,14 @@ var debug_immediate_mesh: ImmediateMesh = null
 var debug_material: StandardMaterial3D = null
 var debug_label_3d: Label3D = null
 
+const NOIR_PROP_MAT: Material = preload("res://assets/material/noir_prop.tres")
+
 func _ready() -> void:
 	add_to_group("interactable")
 	add_to_group("switch")
 	add_to_group("interact_in_dark")
 
+	_apply_noir_materials()
 	if lever_mesh:
 		initial_lever_rot_x = lever_mesh.rotation.x
 
@@ -38,6 +41,16 @@ func _ready() -> void:
 		)
 		if not is_on:
 			hum_player.play()
+
+func _apply_noir_materials() -> void:
+	if has_node("switch"):
+		_apply_material_recursive($switch)
+
+func _apply_material_recursive(node: Node) -> void:
+	for child in node.get_children():
+		if child is MeshInstance3D and child != debug_mesh_instance:
+			child.material_override = NOIR_PROP_MAT
+		_apply_material_recursive(child)
 
 func can_interact_in_dark() -> bool:
 	return true

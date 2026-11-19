@@ -16,7 +16,7 @@
 [ext_resource type="PackedScene" uid="uid://bmxi3rte7nl0d" path="res://scenes/objects/chair.tscn" id="11_wiq14"]
 [ext_resource type="PackedScene" uid="uid://vic01ui0001" path="res://scenes/ui/victory_ui.tscn" id="12_vic"]
 [ext_resource type="PackedScene" uid="uid://dk77ob8o0q5je" path="res://scenes/objects/server.tscn" id="14_vbn34"]
-[ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="15_pause"]
+[ext_resource type="PackedScene" uid="uid://cvc25cwdaahxo" path="res://scenes/ui/pause_menu.tscn" id="15_pause"]
 [ext_resource type="PackedScene" uid="uid://drsn56y4hkgf4" path="res://scenes/objects/tv.tscn" id="18_5bsky"]
 
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_dinding"]
@@ -34,7 +34,6 @@ script = ExtResource("1_map_script")
 
 [node name="Atap" parent="." index="0" unique_id=1890212918]
 transform = Transform3D(0.54, 0, 0, 0, 0.54, 0, 0, 0, 0.54, 0, -0.754911, 0)
-visible = false
 material_override = ExtResource("2_t2abx")
 
 [node name="Dinding" parent="." index="1" unique_id=357441152]

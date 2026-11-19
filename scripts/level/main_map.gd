@@ -18,7 +18,7 @@ const WALL_SOCKETS: Array[Dictionary] = [
 	{ "name": "Utara Tengah", "pos": Vector3(0.00, 1.60, -13.33), "rot_y": deg_to_rad(0.0) },
 	{ "name": "Lorong Timur Tengah", "pos": Vector3(15.34, 1.60, 0.00), "rot_y": deg_to_rad(-90.0) },
 	{ "name": "Ruang Timur Atas", "pos": Vector3(15.34, 1.60, 11.00), "rot_y": deg_to_rad(-90.0) },
-	{ "name": "Lorong Selatan", "pos": Vector3(0.00, 1.60, 9.41), "rot_y": deg_to_rad(180.0) },
+	{ "name": "Lorong Selatan", "pos": Vector3(2.50, 1.60, 9.41), "rot_y": deg_to_rad(180.0) },
 	{ "name": "Ruang Selatan Timur", "pos": Vector3(19.83, 1.60, -17.00), "rot_y": deg_to_rad(-90.0) },
 	{ "name": "Lorong Timur Jauh", "pos": Vector3(27.13, 1.60, 5.00), "rot_y": deg_to_rad(-90.0) }
 ]

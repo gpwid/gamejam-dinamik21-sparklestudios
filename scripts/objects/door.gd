@@ -16,8 +16,11 @@ signal player_escaped()
 var left_closed_rot_y: float = 0.0
 var right_closed_rot_y: float = 0.0
 
+const NOIR_PROP_MAT: Material = preload("res://assets/material/noir_prop.tres")
+
 func _ready() -> void:
 	add_to_group("exit_door")
+	_apply_noir_materials()
 	if left_door:
 		left_closed_rot_y = left_door.rotation.y
 	if right_door:
@@ -27,6 +30,16 @@ func _ready() -> void:
 	if exit_light:
 		exit_light.visible = false
 		exit_light.light_energy = 0.0
+
+func _apply_noir_materials() -> void:
+	if has_node("door"):
+		_apply_material_recursive($door)
+
+func _apply_material_recursive(node: Node) -> void:
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			child.material_override = NOIR_PROP_MAT
+		_apply_material_recursive(child)
 
 func open() -> void:
 	if is_open:
