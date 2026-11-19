@@ -1,10 +1,16 @@
 shader_type spatial;
-render_mode cull_back;
+render_mode cull_disabled, ambient_light_disabled, specular_disabled;
+
+uniform sampler2D albedo_tex : source_color, hint_default_white;
+uniform bool use_texture = false;
+uniform float tex_brightness : hint_range(0.5, 4.0) = 1.6;
+uniform float tex_contrast : hint_range(0.5, 3.0) = 1.25;
+uniform float jumpscare_lit : hint_range(0.0, 1.0) = 0.0;
 
 uniform vec3 body_color : source_color = vec3(1.0, 1.0, 1.0);
 uniform bool is_face = false;
 
-// Pengaturan Mata (Aktif jika is_face = true)
+// Pengaturan Mata (Aktif jika is_face = true dan use_texture = false)
 uniform vec2 eye_left = vec2(0.31, 0.42);
 uniform vec2 eye_right = vec2(0.64, 0.42);
 uniform vec2 eye_size = vec2(0.045, 0.065);
@@ -16,7 +22,12 @@ uniform float eye_glow : hint_range(1.0, 10.0) = 4.5;
 uniform float pulse_speed : hint_range(0.0, 10.0) = 2.2;
 
 void fragment() {
-	if (!is_face) {
+	if (use_texture) {
+		vec3 tex = texture(albedo_tex, UV).rgb;
+		tex = clamp((tex - 0.08) * tex_contrast + 0.08, vec3(0.0), vec3(1.0)) * tex_brightness;
+		ALBEDO = clamp(tex, vec3(0.0), vec3(1.0));
+		EMISSION = ALBEDO * jumpscare_lit * 0.45;
+	} else if (!is_face) {
 		// Tubuh: putih bersih ala komik noir 1-bit
 		ALBEDO = body_color;
 		EMISSION = vec3(0.0);
@@ -70,7 +81,11 @@ void light() {
 	float light_intensity = max(LIGHT_COLOR.r, max(LIGHT_COLOR.g, LIGHT_COLOR.b));
 	float in_atten = step(0.02, ATTENUATION) * step(0.01, light_intensity);
 
-	if (is_face) {
+	if (use_texture) {
+		// Permukaan bertekstur (wajah & organ): terlihat jelas saat terkena cahaya, gelap total saat mati lampu
+		float lit = in_atten * mix(0.75, 1.0, step(0.1, wrap_light));
+		DIFFUSE_LIGHT += ALBEDO * lit;
+	} else if (is_face) {
 		// Wajah selalu tampak jelas di dalam sorotan lampu
 		float lit = in_atten * step(0.08, wrap_light);
 		DIFFUSE_LIGHT += ALBEDO * max(lit, 0.7);

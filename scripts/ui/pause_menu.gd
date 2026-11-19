@@ -13,7 +13,6 @@ class_name PauseMenu
 @onready var main_menu_btn: Button = $MenuRoot/MenuContent/VBoxContainer/ButtonsVBox/MainMenuBtn
 @onready var quit_btn: Button = $MenuRoot/MenuContent/VBoxContainer/ButtonsVBox/QuitBtn
 
-# Settings Modal
 @onready var settings_modal: Control = $SettingsModal
 @onready var settings_close_btn: Button = $SettingsModal/Panel/MarginContainer/VBoxContainer/Header/CloseBtn
 @onready var volume_slider: HSlider = $SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/VolumeRow/VolumeSlider
@@ -23,7 +22,6 @@ class_name PauseMenu
 @onready var sensitivity_slider: HSlider = $SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/SensitivityRow/SensitivitySlider
 @onready var sensitivity_val_lbl: Label = $SettingsModal/Panel/MarginContainer/VBoxContainer/SlidersVBox/SensitivityRow/SensitivityVal
 
-# Confirmation Modal
 @onready var confirm_modal: Control = $ConfirmModal
 @onready var confirm_title_lbl: Label = $ConfirmModal/Panel/MarginContainer/VBoxContainer/Header/Title
 @onready var confirm_close_btn: Button = $ConfirmModal/Panel/MarginContainer/VBoxContainer/Header/CloseBtn
@@ -39,7 +37,6 @@ var is_transitioning: bool = false
 var previous_mouse_mode: Input.MouseMode = Input.MOUSE_MODE_CAPTURED
 var pending_confirm_action: Callable = Callable()
 
-# Static settings agar tersimpan & tersinkronisasi lintas scene / restart
 static var saved_volume: float = 80.0
 static var saved_brightness: float = 50.0
 static var saved_sensitivity: float = 50.0
@@ -53,14 +50,12 @@ func _ready() -> void:
 
 	_init_settings()
 
-	# Hubungkan tombol menu utama
 	_setup_menu_button(resume_btn, "RESUME", resume_game)
 	_setup_menu_button(settings_btn, "SETTINGS", _on_settings_pressed)
 	_setup_menu_button(restart_btn, "RESTART", _on_restart_pressed)
 	_setup_menu_button(main_menu_btn, "MAIN MENU", _on_main_menu_pressed)
 	_setup_menu_button(quit_btn, "QUIT GAME", _on_quit_pressed)
 
-	# Hubungkan tombol modal settings
 	if settings_close_btn:
 		_setup_button(settings_close_btn, _close_settings_modal)
 	if volume_slider:
@@ -70,7 +65,6 @@ func _ready() -> void:
 	if sensitivity_slider:
 		sensitivity_slider.value_changed.connect(_on_sensitivity_changed)
 
-	# Hubungkan tombol modal konfirmasi
 	if confirm_close_btn:
 		_setup_button(confirm_close_btn, _close_confirm_modal)
 	if confirm_no_btn:
@@ -86,19 +80,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-		# Jika modal konfirmasi terbuka, tutup modal saja (jangan resume / pause toggle)
 		if confirm_modal and confirm_modal.visible:
 			_close_confirm_modal()
 			get_viewport().set_input_as_handled()
 			return
 
-		# Jika modal settings terbuka, tutup settings saja (jangan resume / pause toggle)
 		if settings_modal and settings_modal.visible:
 			_close_settings_modal()
 			get_viewport().set_input_as_handled()
 			return
 
-		# Toggle pause jika tidak ada modal yang terbuka
 		if is_paused:
 			resume_game()
 			get_viewport().set_input_as_handled()
@@ -111,12 +102,10 @@ func _can_pause() -> bool:
 	if is_transitioning:
 		return false
 
-	# Jangan izinkan pause saat tertangkap jumpscare
 	var p := _find_player()
 	if p and "is_jumpscared" in p and p.is_jumpscared:
 		return false
 
-	# Jangan izinkan pause saat game selesai / layar kemenangan
 	var parent_node := get_parent()
 	if parent_node and "is_game_finished" in parent_node and parent_node.is_game_finished:
 		return false
@@ -136,9 +125,6 @@ func _can_pause() -> bool:
 
 	return true
 
-# ==============================================================================
-# PAUSE & RESUME
-# ==============================================================================
 func pause_game() -> void:
 	if is_paused or not _can_pause():
 		return
@@ -185,9 +171,6 @@ func resume_game() -> void:
 
 	_play_sfx(0.9)
 
-# ==============================================================================
-# BUTTON ACTIONS & CONFIRMATION
-# ==============================================================================
 func _on_settings_pressed() -> void:
 	_close_all_modals()
 	if settings_modal:
@@ -214,7 +197,6 @@ func _execute_restart() -> void:
 		return
 	is_transitioning = true
 
-	# Pastikan status pause dibersihkan dengan benar sebelum reload
 	get_tree().paused = false
 	Input.set_mouse_mode(previous_mouse_mode)
 
@@ -241,7 +223,6 @@ func _execute_main_menu() -> void:
 		return
 	is_transitioning = true
 
-	# Pastikan status pause dibersihkan sebelum berpindah scene
 	get_tree().paused = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
@@ -303,9 +284,6 @@ func _close_all_modals() -> void:
 	if confirm_modal:
 		confirm_modal.visible = false
 
-# ==============================================================================
-# SETTINGS LOGIC
-# ==============================================================================
 func _init_settings() -> void:
 	if not settings_initialized:
 		var bus_idx := AudioServer.get_bus_index("Master")
@@ -368,9 +346,6 @@ func _on_sensitivity_changed(val: float) -> void:
 	if p and "mouse_sensitivity" in p:
 		p.mouse_sensitivity = 0.003 * (val / 50.0)
 
-# ==============================================================================
-# UI HELPERS & SFX
-# ==============================================================================
 func _setup_menu_button(btn: Button, base_title: String, callback: Callable) -> void:
 	if btn == null:
 		return

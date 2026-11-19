@@ -32,16 +32,13 @@ func open() -> void:
 	if is_open:
 		return
 	is_open = true
-	
-	# Matikan collider penghalang agar pemain bisa lewat
+
 	if door_collider:
 		door_collider.set_deferred("disabled", true)
-	
-	# Suara pintu terbuka
+
 	if open_audio:
 		open_audio.play()
-	
-	# Animasi membuka kedua daun pintu dan menyemburkan cahaya putih
+
 	var tween := create_tween().set_parallel(true)
 	if left_door:
 		var target_left_y := left_closed_rot_y - deg_to_rad(95.0)
@@ -53,13 +50,13 @@ func open() -> void:
 		exit_light.visible = true
 		exit_light.light_energy = 0.0
 		tween.tween_property(exit_light, "light_energy", 12.0, 1.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	
+
 	door_opened.emit()
-	print("[EXIT DOOR] Pintu keluar telah TERBUKA! Ruangan cahaya aktif.")
+	print("[door] opened")
 
 func _on_escape_trigger_entered(body: Node) -> void:
 	if not is_open:
 		return
 	if body.is_in_group("player") or body.name == "Player":
-		print("[VICTORY] Pemain berhasil mencapai pintu keluar dan MELARIKAN DIRI!")
+		print("[door] player escaped")
 		player_escaped.emit()

@@ -1,16 +1,10 @@
 extends CharacterBody3D
 class_name Monster
 
-# ==============================================================================
-# SIGNALS
-# ==============================================================================
 signal state_changed(new_state: State)
 signal investigation_started(target_pos: Vector3)
 signal investigation_ended()
 
-# ==============================================================================
-# ENUM STATES & SOURCES
-# ==============================================================================
 enum State {
 	PATROL,
 	INVESTIGATE,
@@ -24,9 +18,6 @@ enum ChaseSource {
 	DIRECT_SHINE
 }
 
-# ==============================================================================
-# CONFIGURABLE EXPORT VARIABLES
-# ==============================================================================
 @export_group("Monster Movement")
 @export var patrol_speed: float = 1.8
 @export var investigate_speed: float = 2.2
@@ -35,30 +26,30 @@ enum ChaseSource {
 @export var gravity: float = 9.8
 
 @export_group("Patrol Configuration")
-@export var patrol_bounds_min: Vector2 = Vector2(-7.0, -7.5) # Batas lantai X min, Z min
-@export var patrol_bounds_max: Vector2 = Vector2(7.0, 7.0)   # Batas lantai X max, Z max
-@export var patrol_waypoints: Array[Vector3] = []            # Titik-titik rute patroli opsional
-@export var patrol_wait_min: float = 1.0                     # Jeda diam minimal saat sampai di titik tujuan (detik)
-@export var patrol_wait_max: float = 2.0                     # Jeda diam maksimal saat sampai di titik tujuan (detik)
-@export var wall_stuck_timeout: float = 1.0                  # Jika mentok menabrak rintangan > 1.0s, ganti titik tujuan
-@export var min_patrol_distance: float = 3.0                 # Jarak minimal titik patroli baru dari posisi saat ini
+@export var patrol_bounds_min: Vector2 = Vector2(-7.0, -7.5)
+@export var patrol_bounds_max: Vector2 = Vector2(7.0, 7.0)
+@export var patrol_waypoints: Array[Vector3] = []
+@export var patrol_wait_min: float = 1.0
+@export var patrol_wait_max: float = 2.0
+@export var wall_stuck_timeout: float = 1.0
+@export var min_patrol_distance: float = 3.0
 
 @export_group("AStar Navigation & Avoidance")
-@export var grid_cell_size: float = 0.4                      # Ukuran sel grid pemindaian (0.4m - 0.5m)
-@export var grid_bounds_min: Vector2 = Vector2(-9.6, -9.6)   # Batas minimum area lantai (X, Z)
-@export var grid_bounds_max: Vector2 = Vector2(9.6, 9.6)     # Batas maksimum area lantai (X, Z)
-@export var scan_height: float = 0.6                         # Ketinggian raycast/shape scan dari lantai
-@export var obstacle_margin_radius: float = 0.48             # Radius bentuk pengecekan fisika (margin badan monster)
-@export var chase_recalc_interval: float = 0.25              # Interval kalkulasi ulang rute A* saat mengejar player
-@export var avoidance_ray_length: float = 0.85               # Panjang raycast penghalus belokan di depan monster
-@export var avoidance_ray_angle: float = 32.0                # Sudut raycast samping kiri & kanan (derajat)
-@export var waypoint_reach_dist: float = 0.4                 # Jarak ambang batas mencapai waypoint rute A*
+@export var grid_cell_size: float = 0.4
+@export var grid_bounds_min: Vector2 = Vector2(-9.6, -9.6)
+@export var grid_bounds_max: Vector2 = Vector2(9.6, 9.6)
+@export var scan_height: float = 0.6
+@export var obstacle_margin_radius: float = 0.48
+@export var chase_recalc_interval: float = 0.25
+@export var avoidance_ray_length: float = 0.85
+@export var avoidance_ray_angle: float = 32.0
+@export var waypoint_reach_dist: float = 0.4
 
 @export_group("Detection & Ranges")
 @export var jumpscare_distance: float = 1.4
 @export var patrol_radius: float = 10.0
 @export var hearing_radius: float = 6.0
-@export var direct_trigger_chase_duration: float = 4.0       # Wajib: 4.0 detik kejaran saat disorot senter
+@export var direct_trigger_chase_duration: float = 4.0
 @export var direct_shine_cone_tolerance: float = 0.05
 
 @export_group("Timers & Delays")
@@ -76,13 +67,10 @@ enum ChaseSource {
 @export var investigate_sound: AudioStream = preload("res://assets/audio/sfx/monster_investigating.wav")
 @export var finish_investigate_sound: AudioStream = preload("res://assets/audio/sfx/monster_finish_investigating.wav")
 @export var footstep_max_distance: float = 32.0
-@export var patrol_step_interval: float = 0.88          # Tempo langkah santai saat patroli
-@export var investigate_step_interval: float = 0.70     # Tempo langkah waspada saat investigasi
-@export var chase_step_interval: float = 0.35           # Tempo langkah cepat saat mengejar (chase)
+@export var patrol_step_interval: float = 0.88
+@export var investigate_step_interval: float = 0.70
+@export var chase_step_interval: float = 0.35
 
-# ==============================================================================
-# NODE REFERENCES
-# ==============================================================================
 @onready var mesh_instance: MeshInstance3D = get_node_or_null("MeshInstance3D")
 @onready var sprite: Sprite3D = get_node_or_null("Sprite3D")
 @onready var model: Node3D = get_node_or_null("Model")
@@ -94,9 +82,6 @@ enum ChaseSource {
 @onready var jumpscare_light: OmniLight3D = get_node_or_null("JumpscareLight")
 @onready var game_over_ui: CanvasLayer = get_node_or_null("GameOverUI")
 
-# ==============================================================================
-# RUNTIME STATE
-# ==============================================================================
 var current_state: State = State.PATROL:
 	set(val):
 		if current_state != val:
@@ -121,9 +106,11 @@ var astar_grid: AStarGrid2D = null
 var current_path: Array[Vector3] = []
 var current_path_index: int = 0
 
-# ==============================================================================
-# DEBUG VISUALS & STATE MONITORING
-# ==============================================================================
+var _model_shader_materials: Array[ShaderMaterial] = []
+var _model_skeleton: Skeleton3D = null
+var _head_bone_idx: int = -1
+var _head_top_bone_idx: int = -1
+
 var debug_enabled: bool = false:
 	set(val):
 		debug_enabled = val
@@ -143,9 +130,6 @@ var is_permanent_chase: bool = false
 
 var player: Node3D = null
 
-# ==============================================================================
-# INITIALIZATION
-# ==============================================================================
 func _ready() -> void:
 	add_to_group("monster")
 	spawn_position = global_position
@@ -166,12 +150,11 @@ func _ready() -> void:
 		if to_wp.length_squared() > 0.04:
 			basis = Basis.looking_at(to_wp.normalized(), Vector3.UP)
 
-	# Pemindaian ulang pada physics frame pertama untuk memastikan semua sibling StaticBody / CSGBox di level sudah siap
+	# scan again on first physics frame after all level colliders are ready
 	if is_inside_tree() and get_tree():
 		get_tree().physics_frame.connect(scan_obstacles, CONNECT_ONE_SHOT)
 
 func _init_visuals() -> void:
-	# 1. Inisialisasi Model 3D & Shaders
 	if model:
 		model.rotation.y = PI
 		_apply_model_materials()
@@ -181,7 +164,6 @@ func _init_visuals() -> void:
 		if sprite:
 			sprite.visible = false
 
-	# 2. Fallback / legacy quad mesh
 	var tex := load_monster_texture()
 	var mat := _setup_visual_material(tex)
 
@@ -211,25 +193,62 @@ func _init_visuals() -> void:
 func _apply_model_materials() -> void:
 	if model == null:
 		return
-	var body_mat := load("res://assets/material/noir_monster.tres") as Material
-	var face_mat := load("res://assets/material/noir_monster_face.tres") as Material
-	if body_mat == null or face_mat == null:
+	var monster_shader := load("res://assets/material/noir_monster.gdshader") as Shader
+	if monster_shader == null:
 		return
-	_apply_monster_mats_recursive(model, body_mat, face_mat)
+	_model_shader_materials.clear()
+	_apply_monster_mats_recursive(model, monster_shader)
+	_cache_model_head_bones()
 
-func _apply_monster_mats_recursive(node: Node, body_mat: Material, face_mat: Material) -> void:
+func _apply_monster_mats_recursive(node: Node, monster_shader: Shader) -> void:
 	if node is MeshInstance3D:
 		var mi: MeshInstance3D = node
 		mi.material_override = null
 		if mi.mesh:
 			var surf_count := mi.mesh.get_surface_count()
 			for s_idx in range(surf_count):
-				if (mi.name == "Plane" and s_idx == 1) or mi.name == "Plane_001":
-					mi.set_surface_override_material(s_idx, face_mat)
+				var orig_mat := mi.mesh.surface_get_material(s_idx)
+				var sm := ShaderMaterial.new()
+				sm.shader = monster_shader
+				if orig_mat is BaseMaterial3D and orig_mat.albedo_texture != null:
+					sm.set_shader_parameter("use_texture", true)
+					sm.set_shader_parameter("albedo_tex", orig_mat.albedo_texture)
+					sm.set_shader_parameter("tex_brightness", 1.35)
+					sm.set_shader_parameter("tex_contrast", 1.15)
 				else:
-					mi.set_surface_override_material(s_idx, body_mat)
+					sm.set_shader_parameter("use_texture", false)
+				sm.set_shader_parameter("jumpscare_lit", 0.0)
+				mi.set_surface_override_material(s_idx, sm)
+				_model_shader_materials.append(sm)
 	for child in node.get_children():
-		_apply_monster_mats_recursive(child, body_mat, face_mat)
+		_apply_monster_mats_recursive(child, monster_shader)
+
+func _cache_model_head_bones() -> void:
+	_model_skeleton = null
+	_head_bone_idx = -1
+	_head_top_bone_idx = -1
+	if model == null:
+		return
+	_model_skeleton = model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _model_skeleton == null:
+		return
+	_head_bone_idx = _model_skeleton.find_bone("mixamorig_Head")
+	_head_top_bone_idx = _model_skeleton.find_bone("mixamorig_HeadTop_End")
+	if _head_bone_idx == -1:
+		for i in range(_model_skeleton.get_bone_count()):
+			if "head" in _model_skeleton.get_bone_name(i).to_lower():
+				_head_bone_idx = i
+				break
+
+func get_head_global_position() -> Vector3:
+	if is_instance_valid(_model_skeleton) and _head_bone_idx >= 0:
+		var head_pos: Vector3 = _model_skeleton.global_transform * _model_skeleton.get_bone_global_pose(_head_bone_idx).origin
+		if _head_top_bone_idx >= 0:
+			var top_pos: Vector3 = _model_skeleton.global_transform * _model_skeleton.get_bone_global_pose(_head_top_bone_idx).origin
+			# face center is between head base and top of skull
+			return head_pos.lerp(top_pos, 0.45)
+		return head_pos + Vector3(0.0, 0.18, 0.0)
+	return global_position + Vector3(0.0, 2.35, 0.0)
 
 func _init_animations() -> void:
 	if anim_player == null:
@@ -266,21 +285,17 @@ func _init_jumpscare_light() -> void:
 		add_child(jumpscare_light)
 
 func load_monster_texture() -> Texture2D:
-	var tex: Texture2D = null
 	var paths: Array[String] = [
 		"res://assets/placeholders/monster.jpeg",
 		"res://assets/textures/placeholders/monster.jpeg"
 	]
 
-	# 1. Pemuatan via ResourceLoader
 	for p in paths:
 		if ResourceLoader.exists(p):
-			tex = ResourceLoader.load(p) as Texture2D
-			if tex != null:
-				print("[MONSTER] Tekstur berhasil dimuat via ResourceLoader: ", p)
-				return tex
+			var res := ResourceLoader.load(p) as Texture2D
+			if res != null:
+				return res
 
-	# 2. Fallback: Pemuatan langsung dari file (Image.load_from_file)
 	for p in paths:
 		var global_p := ProjectSettings.globalize_path(p)
 		if FileAccess.file_exists(p) or FileAccess.file_exists(global_p):
@@ -289,20 +304,15 @@ func load_monster_texture() -> Texture2D:
 			if err != OK:
 				img = Image.load_from_file(global_p)
 			if img != null and not img.is_empty():
-				tex = ImageTexture.create_from_image(img)
-				print("[MONSTER] Tekstur berhasil dimuat via Image.load_from_file: ", global_p)
-				return tex
+				return ImageTexture.create_from_image(img)
 
-	# 3. Fallback: Prosedural Putih Terang
-	print("[MONSTER WARNING] Gagal memuat file gambar monster. Membuat tekstur kotak putih prosedural sebagai fallback!")
 	var fallback_img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	fallback_img.fill(Color(0.95, 0.95, 0.95, 1.0))
 	for x in range(128):
 		for y in range(128):
 			if x < 4 or x > 123 or y < 4 or y > 123 or (x > 60 and x < 68) or (y > 60 and y < 68):
 				fallback_img.set_pixel(x, y, Color(0.85, 0.1, 0.1, 1.0))
-	tex = ImageTexture.create_from_image(fallback_img)
-	return tex
+	return ImageTexture.create_from_image(fallback_img)
 
 func _setup_visual_material(tex: Texture2D) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
@@ -319,9 +329,7 @@ func _setup_visual_material(tex: Texture2D) -> StandardMaterial3D:
 	mat.roughness = 1.0
 	mat.metallic = 0.0
 
-	# MATIKAN TOTAL EMISSION & UNSHADED:
-	# Dalam kegelapan saat senter OFF, monster 100% hitam pekat (#000000) menyatu penuh dengan kegelapan layar.
-	# Saat terkena ekolokasi (senter OFF), hanya outline siluetnya saja yang menyala, sedangkan tekstur gambar tetap tidak terlihat.
+	# unlit in darkness so only outline appears during echo
 	mat.emission_enabled = false
 	mat.emission = Color.BLACK
 	mat.emission_energy_multiplier = 0.0
@@ -329,7 +337,7 @@ func _setup_visual_material(tex: Texture2D) -> StandardMaterial3D:
 
 func _init_default_waypoints() -> void:
 	if patrol_waypoints.is_empty():
-		# Hanya isi waypoint bawaan jika berada di grid test_world kecil
+		# default waypoints for the small test grid
 		if is_equal_approx(grid_bounds_min.x, -9.6) and is_equal_approx(grid_bounds_max.x, 9.6):
 			var y_lvl := global_position.y
 			patrol_waypoints = [
@@ -444,7 +452,7 @@ func _on_player_footstep_stepped(is_sprint: bool) -> void:
 	if dist <= sprint_hearing_range:
 		last_known_player_position = player_pos
 		if current_state == State.PATROL:
-			print("[MONSTER] Mendengar suara derap lari pemain di jarak %.1fm! Menuju lokasi suara..." % dist)
+			print("[monster] heard sprinting at %.1fm" % dist)
 			investigate_at(player_pos)
 		elif current_state == State.CHASE:
 			last_target_position = player_pos
@@ -465,14 +473,10 @@ func investigate_at(pos: Vector3) -> void:
 		play_investigate_sound()
 	emit_signal("investigation_started", pos)
 
-# ==============================================================================
-# PHYSICS PROCESS & STATE MACHINE
-# ==============================================================================
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(player) or player.is_queued_for_deletion():
 		_find_player()
 
-	# Cek deteksi sorot langsung senter player (Kondisi B)
 	var is_lit := check_direct_flashlight_shine()
 	if is_lit:
 		if current_state == State.PATROL or current_state == State.INVESTIGATE:
@@ -518,9 +522,6 @@ func _update_facing_direction(delta: float) -> void:
 		var target_basis := Basis.looking_at(horiz_vel.normalized(), Vector3.UP)
 		basis = basis.slerp(target_basis, clampf(10.0 * delta, 0.0, 1.0))
 
-# ==============================================================================
-# PATROL LOGIC
-# ==============================================================================
 func _update_patrol(delta: float) -> void:
 	if target_position != last_target_position or current_path.is_empty():
 		last_target_position = target_position
@@ -530,10 +531,9 @@ func _update_patrol(delta: float) -> void:
 	var player_holding: bool = is_instance_valid(player) and "is_holding_breath" in player and player.is_holding_breath
 	var dist_to_player: float = global_position.distance_to(player.global_position) if is_instance_valid(player) else 999.0
 
-	# 1. Fase Diam Sebentar (1.0 - 2.0 detik) saat sampai di titik tujuan
 	if is_waiting:
 		play_animation("idle", 1.0)
-		# Jika player sedang menahan napas di dekat (< 5.5m), jangan diam nongkrong: segera lanjut patroli menjauh!
+		# keep moving away if the player is holding breath nearby
 		if player_holding and dist_to_player < 5.5:
 			is_waiting = false
 			state_timer = 0.0
@@ -559,11 +559,9 @@ func _update_patrol(delta: float) -> void:
 			last_target_position = target_position
 			current_path = find_path_to(target_position)
 			current_path_index = 0
-			print("[MONSTER] Jeda patroli selesai. Menuju ke titik patroli baru via A*: ", target_position)
 		return
 
-	# Jika saat sedang berjalan patroli, pemain mulai menahan napas dan target patroli monster terlalu dekat ke pemain (< 3.0m):
-	# Segera alihkan rute ke target lain yang menjauh dari pemain!
+	# steer away if patrol target is too close to a stealthy player
 	if player_holding and dist_to_player < 5.5 and is_instance_valid(player) and target_position.distance_to(player.global_position) < 3.0:
 		target_position = get_next_patrol_target()
 		last_target_position = target_position
@@ -571,14 +569,12 @@ func _update_patrol(delta: float) -> void:
 		current_path_index = 0
 		return
 
-	# 2. Cek apakah sudah sampai di titik tujuan patroli (jarak horizontal <= 0.85m atau titik akhir rute tercapai)
 	var diff := target_position - global_position
 	diff.y = 0.0
 	var dist := diff.length()
 	var path_finished: bool = (not current_path.is_empty() and current_path_index >= current_path.size() - 1 and (current_path[-1] - global_position).length() <= waypoint_reach_dist + 0.15)
 
 	if dist <= 0.85 or path_finished:
-		# Jika player sedang menahan napas di dekat, lewati tanpa berhenti diam
 		if player_holding and dist_to_player < 5.5:
 			is_waiting = false
 			stuck_timer = 0.0
@@ -586,7 +582,6 @@ func _update_patrol(delta: float) -> void:
 			last_target_position = target_position
 			current_path = find_path_to(target_position)
 			current_path_index = 0
-			print("[MONSTER] Melewati pemain yang sedang menahan napas tanpa berhenti.")
 			return
 
 		is_waiting = true
@@ -594,10 +589,9 @@ func _update_patrol(delta: float) -> void:
 		stuck_timer = 0.0
 		velocity.x = 0.0
 		velocity.z = 0.0
-		print("[MONSTER] Sampai di titik tujuan patroli %s. Diam sebentar selama %s detik..." % [target_position, snapped(state_timer, 0.1)])
 		return
 
-	# 3. Deteksi tabrakan dinding/objek/macet (Anti-Stuck):
+	# anti-stuck check
 	var horiz_vel := Vector2(velocity.x, velocity.z).length()
 	var real_vel := get_real_velocity()
 	var real_speed := Vector2(real_vel.x, real_vel.z).length()
@@ -606,7 +600,6 @@ func _update_patrol(delta: float) -> void:
 		stuck_timer += delta
 		if stuck_timer >= 0.7:
 			stuck_timer = 0.0
-			# Lepaskan fisik monster jika terjepit di sudut/pojok dinding
 			if is_on_wall():
 				var wall_n := get_wall_normal()
 				wall_n.y = 0.0
@@ -616,12 +609,10 @@ func _update_patrol(delta: float) -> void:
 			last_target_position = target_position
 			current_path = find_path_to(target_position)
 			current_path_index = 0
-			print("[MONSTER] Mentok menabrak rintangan! Nudge keluar & mengalihkan ke titik patroli baru: %s" % [target_position])
 			return
 	else:
 		stuck_timer = maxf(0.0, stuck_timer - delta * 0.5)
 
-	# 4. Berjalan aktif mengikuti rute terdekat A* dengan Raycast Smoothing
 	play_animation("patrol", clampf(patrol_speed / 1.8, 0.8, 1.6))
 	_follow_path(patrol_speed, delta)
 
@@ -631,7 +622,6 @@ func get_next_patrol_target() -> Vector3:
 
 	if not patrol_waypoints.is_empty():
 		if player_holding:
-			# Cari waypoint berikutnya dalam daftar yang mengarah menjauh dari posisi pemain (jarak >= 5.5m)
 			for step in range(patrol_waypoints.size()):
 				var idx := posmod(current_waypoint_index + 1 + step, patrol_waypoints.size())
 				var candidate_wp := patrol_waypoints[idx]
@@ -657,7 +647,7 @@ func get_next_patrol_target() -> Vector3:
 		var candidate_2d := Vector2(rx, rz)
 		if current_pos_2d.distance_to(candidate_2d) >= min_patrol_distance:
 			if player_holding and candidate_2d.distance_to(player_pos_2d) < 5.5:
-				continue # Jangan pilih titik dekat pemain saat pemain sedang menahan napas!
+				continue
 			return Vector3(rx, global_position.y, rz)
 
 	var fallback_x := randf_range(patrol_bounds_min.x, patrol_bounds_max.x)
@@ -667,9 +657,6 @@ func get_next_patrol_target() -> Vector3:
 func _pick_new_patrol_target() -> void:
 	target_position = get_next_patrol_target()
 
-# ==============================================================================
-# INVESTIGATE LOGIC (REAKSI SUARA EKOLOKASI)
-# ==============================================================================
 func _update_investigate(delta: float) -> void:
 	if target_position != last_target_position or current_path.is_empty():
 		last_target_position = target_position
@@ -679,10 +666,8 @@ func _update_investigate(delta: float) -> void:
 	var player_holding: bool = is_instance_valid(player) and "is_holding_breath" in player and player.is_holding_breath
 	var dist_to_player: float = global_position.distance_to(player.global_position) if is_instance_valid(player) else 999.0
 
-	# 1. Fase Menunggu Investigasi Selesai
 	if is_waiting:
 		play_animation("idle", 1.0)
-		# Jika pemain sedang menahan napas di dekat (< 5.5m), monster tidak nongkrong: langsung kembali patroli menjauh!
 		if player_holding and dist_to_player < 5.5:
 			is_waiting = false
 			_enter_patrol()
@@ -701,16 +686,13 @@ func _update_investigate(delta: float) -> void:
 			_enter_patrol()
 		return
 
-	# 2. Cek apakah sudah sampai di lokasi investigasi atau path selesai
 	var diff := target_position - global_position
 	diff.y = 0.0
 	var dist_to_target := diff.length()
 	var path_finished: bool = (not current_path.is_empty() and current_path_index >= current_path.size() - 1 and (current_path[-1] - global_position).length() <= waypoint_reach_dist + 0.15)
 
 	if dist_to_target <= 1.2 or path_finished:
-		# Jika pemain sedang menahan napas di dekat: monster menyimpulkan tidak ada siapa-siapa, segera beranjak pergi
 		if player_holding and dist_to_player < 5.5:
-			print("[MONSTER] Suara ekolokasi hilang, pemain menahan napas. Kembali patroli menjauh.")
 			_enter_patrol()
 			return
 
@@ -720,7 +702,6 @@ func _update_investigate(delta: float) -> void:
 		velocity.z = 0.0
 		return
 
-	# 3. Deteksi Mentok (Anti-Stuck) saat investigasi
 	var horiz_vel := Vector2(velocity.x, velocity.z).length()
 	var real_vel := get_real_velocity()
 	var real_speed := Vector2(real_vel.x, real_vel.z).length()
@@ -734,13 +715,11 @@ func _update_investigate(delta: float) -> void:
 				wall_n.y = 0.0
 				if wall_n.length() > 0.01:
 					global_position += wall_n.normalized() * 0.18
-			print("[MONSTER] Terhalang rintangan saat investigasi. Nudge keluar & kembali ke Patroli.")
 			_enter_patrol()
 			return
 	else:
 		stuck_timer = maxf(0.0, stuck_timer - delta * 0.5)
 
-	# 4. Berjalan aktif mengikuti rute
 	play_animation("patrol", clampf(investigate_speed / 1.8, 0.8, 1.6))
 	_follow_path(investigate_speed, delta)
 
@@ -758,15 +737,10 @@ func _on_echolocation_made(sound_origin: Vector3, _radius: float) -> void:
 		current_path_index = 0
 		is_waiting = false
 		state_timer = 0.0
-		# Putar audio investigasi jika belum berbunyi
 		if not was_investigating or (voice_player and not voice_player.playing):
 			play_investigate_sound()
 		emit_signal("investigation_started", sound_origin)
-		print("[MONSTER] Mendengar suara ekolokasi di %s (jarak: %s m). Menuju lokasi via A* Shortest Path..." % [sound_origin, snapped(dist, 0.1)])
 
-# ==============================================================================
-# CHASE LOGIC (KONDISI A & KONDISI B)
-# ==============================================================================
 func _update_chase(delta: float) -> void:
 	if not is_instance_valid(player):
 		_enter_patrol()
@@ -775,31 +749,22 @@ func _update_chase(delta: float) -> void:
 	var player_pos := player.global_position
 	var dist_to_player := global_position.distance_to(player_pos)
 
-	# Jumpscare check
 	if dist_to_player <= jumpscare_distance:
 		_enter_jumpscare()
 		return
 
-	# Catat posisi pemain setiap frame
 	last_known_player_position = player_pos
-
-	# Cek apakah monster masih memiliki Line of Sight langsung ke pemain
 	var has_los := _has_line_of_sight(player_pos)
 
 	if is_permanent_chase:
-		# Mode Klimaks Pintu Terbuka: Monster tidak pernah menyerah atau kembali ke patroli!
 		pass
 	elif chase_source == ChaseSource.DIRECT_SHINE:
 		if has_los:
-			# Selama pemain masih terlihat langsung (misal di lorong panjang):
-			# Reset timer kejaran agar monster TIDAK PERNAH berhenti mengejar di depan mata pemain!
+			# keep timer full while player is in direct view
 			direct_chase_timer = direct_trigger_chase_duration
 		else:
-			# Garis pandang terputus (pemain berbelok atau masuk kamar):
-			# Timer hitung mundur mulai berjalan!
 			direct_chase_timer -= delta
 			if direct_chase_timer <= 0.0:
-				print("[MONSTER] Kehilangan garis pandang pemain di balik belokan. Menuju ke lokasi terakhir terlihat untuk mencari!")
 				_enter_search_at_last_known()
 				return
 	elif chase_source == ChaseSource.OVERHEAT:
@@ -807,11 +772,9 @@ func _update_chase(delta: float) -> void:
 		if "is_triggered" in player:
 			is_player_triggered = player.is_triggered
 		if not is_player_triggered and not has_los:
-			print("[MONSTER] Masa kejaran Overheat selesai & pemain tidak terlihat. Menuju lokasi terakhir untuk mencari.")
 			_enter_search_at_last_known()
 			return
 
-	# Update rute A* secara berkala ke posisi real-time player
 	path_recalc_timer -= delta
 	if path_recalc_timer <= 0.0 or current_path.is_empty() or last_target_position.distance_to(player_pos) > 1.2:
 		path_recalc_timer = chase_recalc_interval
@@ -820,7 +783,6 @@ func _update_chase(delta: float) -> void:
 		current_path = find_path_to(player_pos)
 		current_path_index = 0
 
-	# Anti-stuck saat mengejar jika terjepit di sudut/pojok dinding
 	var horiz_vel := Vector2(velocity.x, velocity.z).length()
 	var real_vel := get_real_velocity()
 	var real_speed := Vector2(real_vel.x, real_vel.z).length()
@@ -844,15 +806,14 @@ func _update_chase(delta: float) -> void:
 
 func _enter_search_at_last_known() -> void:
 	investigate_at(last_known_player_position)
-	print("[MONSTER] Beralih ke INVESTIGASI / SEARCH di lokasi terakhir pemain terlihat: %s" % last_known_player_position)
 
 func trigger_direct_shine_chase() -> void:
 	current_state = State.CHASE
 	chase_source = ChaseSource.DIRECT_SHINE
 	direct_chase_timer = direct_trigger_chase_duration
 	is_waiting = false
-	path_recalc_timer = 0.0 # Segera hitung jalur ke posisi player
-	print("[MONSTER] CHASE AKTIF: Monster tersorot senter langsung (Kondisi B)! Durasi kejar: %s detik." % direct_trigger_chase_duration)
+	path_recalc_timer = 0.0
+	print("[monster] direct shine chase started")
 	_play_scream()
 	play_animation("chase", clampf(chase_speed / 3.6, 0.9, 1.8))
 
@@ -860,7 +821,6 @@ func _on_player_flashlight_overheated(_player_pos: Vector3) -> void:
 	if current_state == State.JUMPSCARE:
 		return
 	if current_state == State.CHASE:
-		# Jika sedang dalam pengejaran Kondisi B, beralih ke sumber OVERHEAT tanpa dobel scream/reset
 		chase_source = ChaseSource.OVERHEAT
 		return
 
@@ -871,7 +831,7 @@ func trigger_overheat_chase() -> void:
 	chase_source = ChaseSource.OVERHEAT
 	is_waiting = false
 	path_recalc_timer = 0.0
-	print("[MONSTER] CHASE AKTIF: Parameter senter overheat 100% (Kondisi A)!")
+	print("[monster] overheat chase started")
 	if not has_screamed_chase:
 		_play_scream()
 		has_screamed_chase = true
@@ -885,7 +845,7 @@ func trigger_permanent_chase() -> void:
 	path_recalc_timer = 0.0
 	_play_scream()
 	play_animation("chase", clampf(chase_speed / 3.6, 0.9, 1.8))
-	print("[MONSTER] KLIMAKS CHASE PERMANEN AKTIF: Pintu keluar terbuka!")
+	print("[monster] permanent chase active")
 
 func trigger_close_gasp_chase() -> void:
 	if current_state == State.JUMPSCARE:
@@ -895,7 +855,6 @@ func trigger_close_gasp_chase() -> void:
 	direct_chase_timer = direct_trigger_chase_duration
 	is_waiting = false
 	path_recalc_timer = 0.0
-	print("[MONSTER] CHASE AKTIF: Mendengar nafas ngos-ngosan / gasping pemain dari jarak dekat (<6m)!")
 	_play_scream()
 	play_animation("chase", clampf(chase_speed / 3.6, 0.9, 1.8))
 
@@ -907,17 +866,11 @@ func trigger_lethal_hearing_chase() -> void:
 	direct_chase_timer = direct_trigger_chase_duration
 	is_waiting = false
 	path_recalc_timer = 0.0
-	print("[MONSTER] CHASE AKTIF: Mendeteksi suara/cahaya pemain di Lethal Hearing Zone (<4m)!")
 	_play_scream()
 	play_animation("chase", clampf(chase_speed / 3.6, 0.9, 1.8))
 
-# ==============================================================================
-# DETEKSI SOROT LANGSUNG SENTER (RAYCAST & CONE CHECK)
-# ==============================================================================
 func check_direct_flashlight_shine() -> bool:
-	if not is_inside_tree():
-		return false
-	if not is_instance_valid(player):
+	if not is_inside_tree() or not is_instance_valid(player):
 		return false
 
 	var fl: SpotLight3D = null
@@ -968,26 +921,17 @@ func check_direct_flashlight_shine() -> bool:
 
 	return false
 
-# ==============================================================================
-# JUMPSCARE & GAME OVER
-# ==============================================================================
 func _enter_jumpscare() -> void:
 	current_state = State.JUMPSCARE
 	velocity = Vector3.ZERO
 	state_timer = jumpscare_delay
-	print("[MONSTER] JUMPSCARE! Monster menangkap player pada jarak %s m." % snapped(global_position.distance_to(player.global_position), 0.1))
+	print("[monster] jumpscare triggered")
 	_play_scream()
 	play_animation("jumpscare", 1.0, 0.0)
 
-	# 1. Posisikan wajah monster tepat di depan kamera player (jarak 0.6m - 1.0m, anti-clipping & anti-obstruct)
 	_position_for_jumpscare()
-
-	# 2. Paksa visual monster langsung terlihat jelas di kegelapan:
-	#    - Ubah material secara dinamis: SHADING_MODE_UNSHADED + emission terang
-	#    - Nyalakan cahaya sorot jumpscare (OmniLight3D)
 	_apply_jumpscare_visuals()
 
-	# 3. Kunci pergerakan player dan picu animasi/camera shake jumpscare
 	if player and player.has_method("trigger_jumpscare"):
 		player.trigger_jumpscare(self)
 
@@ -1015,9 +959,8 @@ func _position_for_jumpscare() -> void:
 		cam = player.get_node("Head/Camera3D") as Camera3D
 
 	var cam_pos := cam.global_position if cam else (player.global_position + Vector3(0.0, 1.6, 0.0))
-	var jumpscare_dist: float = 1.85 # Animasi jumpscare menerjang maju ~1.1m sehingga wajah berhenti di jarak ~0.75m (anti-clipping)
+	var jumpscare_dist: float = 2.05 # lunges forward ~1.3m, head stops ~0.75m from camera
 
-	# Arah horizontal dari kamera ke monster (atau arah pandang kamera)
 	var forward := -cam.global_transform.basis.z if cam else -player.global_transform.basis.z
 	var dir_to_monster := global_position - player.global_position
 	dir_to_monster.y = 0.0
@@ -1033,7 +976,6 @@ func _position_for_jumpscare() -> void:
 	var target_pos := cam_pos + target_dir * jumpscare_dist
 	target_pos.y = player.global_position.y
 
-	# Anti-Obstruction Check: Raycast dari kamera ke target_pos agar tidak tertutup tembok/objek
 	if is_inside_tree() and get_world_3d():
 		var space_state := get_world_3d().direct_space_state
 		if space_state:
@@ -1046,7 +988,7 @@ func _position_for_jumpscare() -> void:
 			if not hit.is_empty():
 				var hit_pos: Vector3 = hit.position
 				var hit_dir := (hit_pos - cam_pos).normalized()
-				var safe_dist := maxf(1.1, hit_pos.distance_to(cam_pos) - 0.2)
+				var safe_dist := maxf(1.35, hit_pos.distance_to(cam_pos) - 0.2)
 				target_pos = cam_pos + hit_dir * safe_dist
 				target_pos.y = player.global_position.y
 
@@ -1058,7 +1000,10 @@ func _position_for_jumpscare() -> void:
 			basis = Basis.looking_at(to_player.normalized(), Vector3.UP)
 
 func _apply_jumpscare_visuals() -> void:
-	# 1. Ubah material secara dinamis: Unshaded + Emission terang jika ada
+	for sm in _model_shader_materials:
+		if is_instance_valid(sm):
+			sm.set_shader_parameter("jumpscare_lit", 1.0)
+
 	var mat: StandardMaterial3D = _get_active_material()
 	if mat:
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -1067,19 +1012,20 @@ func _apply_jumpscare_visuals() -> void:
 		mat.emission_energy_multiplier = 1.2
 		mat.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 
-	# 2. Nyalakan lampu sorot khusus jumpscare di depan wajah
 	if jumpscare_light:
 		jumpscare_light.visible = true
-		jumpscare_light.light_energy = 1.2
-		jumpscare_light.position = Vector3(0.0, 2.2, 0.4)
+		jumpscare_light.light_energy = 1.0
+		jumpscare_light.position = Vector3(0.0, 2.2, -1.5)
 
-	# 3. Nyalakan juga cahaya di player (flashlight) jika ada agar wajah monster tersinari langsung
 	if is_instance_valid(player) and "flashlight" in player and player.flashlight is SpotLight3D:
 		player.flashlight.visible = true
 		player.flashlight.light_energy = maxf(player.flashlight.light_energy, 1.5)
 
 func reset_monster_visuals() -> void:
-	# Kembalikan material ke mode gameplay normal (100% hitam pekat dalam kegelapan)
+	for sm in _model_shader_materials:
+		if is_instance_valid(sm):
+			sm.set_shader_parameter("jumpscare_lit", 0.0)
+
 	var mat: StandardMaterial3D = _get_active_material()
 	if mat:
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
@@ -1105,9 +1051,6 @@ func _get_active_material() -> StandardMaterial3D:
 		return sprite.material_override as StandardMaterial3D
 	return null
 
-# ==============================================================================
-# LOCOMOTION, A* NAVIGATION & RAYCAST SMOOTHING
-# ==============================================================================
 func _init_navigation_grid() -> void:
 	astar_grid = AStarGrid2D.new()
 	var w := int(round((grid_bounds_max.x - grid_bounds_min.x) / grid_cell_size))
@@ -1157,15 +1100,13 @@ func scan_obstacles() -> void:
 			var hits = space_state.intersect_shape(query, 1)
 			if not hits.is_empty():
 				var collider = hits[0].collider
-				# Jangan tandai lantai horizontal sebagai obstacle
+				# ignore horizontal floors and ceilings
 				if collider is CSGBox3D and collider.name == "CSGBox3D":
 					continue
 				if collider.name in ["Plane", "Lantai", "Atap"] or (collider.get_parent() and (collider.get_parent().name.begins_with("Plane") or collider.get_parent().name in ["Lantai", "Atap"])):
 					continue
 				astar_grid.set_point_solid(Vector2i(gx, gz), true)
 				solid_count += 1
-
-	print("[MONSTER] Auto-Scan AStarGrid2D selesai. Grid: %dx%d (%d sel), Solid obstacle: %d sel." % [r.size.x, r.size.y, r.size.x * r.size.y, solid_count])
 
 func world_to_grid(world_pos: Vector3) -> Vector2i:
 	if astar_grid == null:
@@ -1218,7 +1159,6 @@ func find_path_to(target_pos: Vector3) -> Array[Vector3]:
 	for p in pts_2d:
 		result_path.append(Vector3(p.x, y_lvl, p.y))
 
-	# Jika titik terakhir path agak jauh dari target akhir yang diminta, tambahkan target_pos
 	if not result_path.is_empty():
 		var last_pt := result_path[-1]
 		if Vector2(last_pt.x, last_pt.z).distance_to(Vector2(target_pos.x, target_pos.z)) > 0.15:
@@ -1238,7 +1178,6 @@ func _follow_path(speed: float, delta: float) -> void:
 		move_and_slide()
 		return
 
-	# Majukan waypoint jika monster sudah mendekati titik waypoint saat ini
 	while current_path_index < current_path.size() - 1:
 		var wp := current_path[current_path_index]
 		var diff_wp := wp - global_position
@@ -1246,17 +1185,12 @@ func _follow_path(speed: float, delta: float) -> void:
 		if diff_wp.length() < waypoint_reach_dist:
 			current_path_index += 1
 		else:
-			# Line-of-sight shortcutting:
-			# Hanya boleh potong rute jika:
-			# 1. Monster tidak sedang menempel/menyentuh dinding (not is_on_wall())
-			# 2. Sudut ke waypoint berikutnya bukan tikungan tajam / sudut pojok (angle < 35 derajat)
-			# 3. Seluruh lebar badan monster (shoulder clearance) memiliki garis pandang bebas rintangan
+			# cut corners only on gentle turns away from walls
 			if not is_on_wall() and current_path_index + 1 < current_path.size():
 				var next_wp := current_path[current_path_index + 1]
 				var dir_to_wp := diff_wp.normalized()
 				var dir_next := (next_wp - wp)
 				dir_next.y = 0.0
-				# Jika berbelok tajam di sudut (> 35 derajat, dot < 0.82), monster WAJIB mengitari puncak sudut waypoint terlebih dahulu
 				if dir_next.length() > 0.05 and dir_to_wp.dot(dir_next.normalized()) < 0.82:
 					break
 				if _has_line_of_sight(next_wp):
@@ -1270,17 +1204,13 @@ func _follow_path(speed: float, delta: float) -> void:
 
 	if dist > 0.05:
 		var desired_dir := diff.normalized()
-
-		# Raycast Smoothing & Local Avoidance di sekitar sudut/pojok objek
 		desired_dir = _apply_raycast_smoothing(desired_dir)
 
-		# Slide collision handling fisik saat menyentuh dinding / objek
 		if is_on_wall():
 			var wall_norm := get_wall_normal()
 			wall_norm.y = 0.0
 			if wall_norm.length() > 0.01:
 				var norm := wall_norm.normalized()
-				# Jika arah gerakan monster mengarah menembus/menekan dinding, pantulkan sedikit menjauh dari dinding
 				if desired_dir.dot(norm) < 0.0:
 					desired_dir = (desired_dir + norm * 0.6).normalized()
 
@@ -1316,16 +1246,13 @@ func _apply_raycast_smoothing(desired_dir: Vector3) -> Vector3:
 	var dir_left := desired_dir.rotated(Vector3.UP, rad)
 	var dir_right := desired_dir.rotated(Vector3.UP, -rad)
 
-	# 1. Center Ray
 	query.from = origin
 	query.to = origin + dir_center * avoidance_ray_length
 	var hit_center := space_state.intersect_ray(query)
 
-	# 2. Left Ray
 	query.to = origin + dir_left * (avoidance_ray_length * 0.85)
 	var hit_left := space_state.intersect_ray(query)
 
-	# 3. Right Ray
 	query.to = origin + dir_right * (avoidance_ray_length * 0.85)
 	var hit_right := space_state.intersect_ray(query)
 
@@ -1369,7 +1296,6 @@ func _has_line_of_sight(to_pos: Vector3) -> bool:
 	if is_instance_valid(player) and player is CollisionObject3D:
 		excludes.append(player.get_rid())
 
-	# 1. Center Ray
 	var query := PhysicsRayQueryParameters3D.create(from_pos, target_pos)
 	query.collide_with_bodies = true
 	query.collide_with_areas = false
@@ -1377,7 +1303,7 @@ func _has_line_of_sight(to_pos: Vector3) -> bool:
 	if not space_state.intersect_ray(query).is_empty():
 		return false
 
-	# 2. Dual Shoulder Rays (memastikan lebar badan 0.38m di kiri & kanan tidak menabrak sudut dinding)
+	# check shoulder clearance on left and right
 	var perp := diff.cross(Vector3.UP).normalized() * 0.38
 	query.from = from_pos + perp
 	query.to = target_pos + perp
@@ -1433,14 +1359,12 @@ func _update_footsteps(delta: float) -> void:
 	if not footstep_player:
 		return
 
-	# Jangan bersuara jika sedang jumpscare atau sedang berhenti diam (waiting)
 	if current_state == State.JUMPSCARE or is_waiting:
 		if footstep_player.playing:
 			footstep_player.stop()
 		footstep_timer = 0.15
 		return
 
-	# Cek apakah monster benar-benar bergerak di atas lantai
 	var horiz_vel := Vector2(velocity.x, velocity.z).length()
 	var real_vel := get_real_velocity()
 	var real_speed := Vector2(real_vel.x, real_vel.z).length()
@@ -1449,7 +1373,6 @@ func _update_footsteps(delta: float) -> void:
 		footstep_timer = 0.15
 		return
 
-	# Atur tempo langkah, pitch, dan volume berdasarkan status gerakan monster
 	var step_interval: float = patrol_step_interval
 	var pitch_min: float = 0.88
 	var pitch_max: float = 0.98
@@ -1488,22 +1411,19 @@ func _trigger_monster_footstep(pitch_min: float, pitch_max: float, vol_db: float
 	footstep_player.volume_db = vol_db
 	footstep_player.pitch_scale = randf_range(pitch_min, pitch_max)
 
-	# Bergantian antara langkah kaki kiri (offset 0.0s) dan kanan (offset 2.38s)
+	# alternate between left (0.0s) and right (2.38s) footsteps
 	footstep_alt = not footstep_alt
 	var offset: float = 0.0 if footstep_alt else 2.38
 	footstep_player.play(offset)
 
-# ==============================================================================
-# DEBUG VISUAL DRAWING (WIREFRAME, X-RAY BOUNDING BOX, LINE OF SIGHT, ASTAR PATH)
-# ==============================================================================
 func _init_debug_draw() -> void:
 	debug_immediate_mesh = ImmediateMesh.new()
 	debug_material = StandardMaterial3D.new()
 	debug_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	debug_material.vertex_color_use_as_albedo = true
 	debug_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	debug_material.no_depth_test = true # X-Ray: Tembus pandang dinding tanpa terhalang geometri lain
-	debug_material.render_priority = 127 # Prioritas render tertinggi, digambar paling akhir di atas semua pass
+	debug_material.no_depth_test = true
+	debug_material.render_priority = 127
 	debug_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	debug_mesh_instance = MeshInstance3D.new()
@@ -1511,18 +1431,17 @@ func _init_debug_draw() -> void:
 	debug_mesh_instance.mesh = debug_immediate_mesh
 	debug_mesh_instance.material_override = debug_material
 	debug_mesh_instance.top_level = true
-	debug_mesh_instance.extra_cull_margin = 16384.0 # Mencegah culling kamera saat pemain berpaling
+	debug_mesh_instance.extra_cull_margin = 16384.0
 	debug_mesh_instance.ignore_occlusion_culling = true
 	debug_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	debug_mesh_instance.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
 	debug_mesh_instance.visible = debug_enabled
 	add_child(debug_mesh_instance)
 
-	# Label 3D X-Ray Melayang di Atas Kepala Monster
 	debug_label_3d = Label3D.new()
 	debug_label_3d.name = "MonsterDebugLabel3D"
 	debug_label_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	debug_label_3d.no_depth_test = true # X-Ray text tembus dinding
+	debug_label_3d.no_depth_test = true
 	debug_label_3d.render_priority = 127
 	debug_label_3d.pixel_size = 0.006
 	debug_label_3d.font = load("res://assets/fonts/HandymandiFree.ttf")
@@ -1539,7 +1458,6 @@ func _update_debug_draw() -> void:
 	if not debug_enabled or debug_immediate_mesh == null or not is_inside_tree():
 		return
 
-	# State AI dalam teks (Monokrom / Putih)
 	var s_text := "PATROL"
 	if current_state == State.INVESTIGATE:
 		s_text = "INVESTIGATE"
@@ -1548,7 +1466,6 @@ func _update_debug_draw() -> void:
 	elif current_state == State.JUMPSCARE:
 		s_text = "JUMPSCARE"
 
-	# Update Label 3D X-Ray Melayang (Putih)
 	if debug_label_3d:
 		var dist_to_p := global_position.distance_to(player.global_position) if (player and is_instance_valid(player)) else 0.0
 		debug_label_3d.text = "[MONSTER: %s]\n%.1f m" % [s_text, dist_to_p]
@@ -1570,22 +1487,19 @@ func _update_debug_draw() -> void:
 	var p6 := center + Vector3( hw,  hh,  hd)
 	var p7 := center + Vector3(-hw,  hh,  hd)
 
-	# 1. Surface Triangles: Solid Translucent X-Ray Box Volume (Putih Transparan)
 	debug_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, debug_material)
 	var fill_col := Color(1.0, 1.0, 1.0, 0.15)
-	_add_debug_quad_triangles(p0, p1, p2, p3, fill_col) # Bawah
-	_add_debug_quad_triangles(p4, p5, p6, p7, fill_col) # Atas
-	_add_debug_quad_triangles(p3, p2, p6, p7, fill_col) # Depan (+Z)
-	_add_debug_quad_triangles(p1, p0, p4, p5, fill_col) # Belakang (-Z)
-	_add_debug_quad_triangles(p0, p3, p7, p4, fill_col) # Kiri (-X)
-	_add_debug_quad_triangles(p2, p1, p5, p6, fill_col) # Kanan (+X)
+	_add_debug_quad_triangles(p0, p1, p2, p3, fill_col)
+	_add_debug_quad_triangles(p4, p5, p6, p7, fill_col)
+	_add_debug_quad_triangles(p3, p2, p6, p7, fill_col)
+	_add_debug_quad_triangles(p1, p0, p4, p5, fill_col)
+	_add_debug_quad_triangles(p0, p3, p7, p4, fill_col)
+	_add_debug_quad_triangles(p2, p1, p5, p6, fill_col)
 	debug_immediate_mesh.surface_end()
 
-	# 2. Surface Lines: Wireframe Edges, Diagonals, Spine, Gaze, and A* Path (Monokrom Putih)
 	debug_immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINES, debug_material)
 	var wire_col := Color(1.0, 1.0, 1.0, 0.9)
 
-	# 12 Tepi Bounding Box
 	_add_debug_segment(p0, p1, wire_col)
 	_add_debug_segment(p1, p2, wire_col)
 	_add_debug_segment(p2, p3, wire_col)
@@ -1599,47 +1513,39 @@ func _update_debug_draw() -> void:
 	_add_debug_segment(p2, p6, wire_col)
 	_add_debug_segment(p3, p7, wire_col)
 
-	# Diagonal X pada Atas dan Bawah Box
 	_add_debug_segment(p4, p6, Color(1.0, 1.0, 1.0, 0.5))
 	_add_debug_segment(p5, p7, Color(1.0, 1.0, 1.0, 0.5))
 	_add_debug_segment(p0, p2, Color(1.0, 1.0, 1.0, 0.4))
 	_add_debug_segment(p1, p3, Color(1.0, 1.0, 1.0, 0.4))
 
-	# Tulang vertikal pusat (Center Spine)
 	_add_debug_segment(center - Vector3(0, hh, 0), center + Vector3(0, hh, 0), Color(1.0, 1.0, 1.0, 0.6))
 
-	# Garis Pandangan & Cone Penglihatan (Line of Sight)
 	var eye_pos := global_position + Vector3(0.0, scan_height, 0.0)
 	var fwd := -transform.basis.z.normalized()
 	if velocity.length_squared() > 0.05:
 		fwd = Vector3(velocity.x, 0.0, velocity.z).normalized()
 
-	# Gaze center line (Putih terang)
 	_add_debug_segment(eye_pos, eye_pos + fwd * 4.5, Color(1.0, 1.0, 1.0, 0.9))
-	# Vision cone borders (+- 30 derajat)
 	var left_cone := fwd.rotated(Vector3.UP, deg_to_rad(30.0))
 	var right_cone := fwd.rotated(Vector3.UP, deg_to_rad(-30.0))
 	_add_debug_segment(eye_pos, eye_pos + left_cone * 5.0, Color(1.0, 1.0, 1.0, 0.45))
 	_add_debug_segment(eye_pos, eye_pos + right_cone * 5.0, Color(1.0, 1.0, 1.0, 0.45))
 	_add_debug_segment(eye_pos + left_cone * 5.0, eye_pos + right_cone * 5.0, Color(1.0, 1.0, 1.0, 0.45))
 
-	# Ray ke Player (Putih pekat jika terlihat, putih tipis jika terhalang dinding)
 	if player and is_instance_valid(player):
 		var p_pos := player.global_position + Vector3(0.0, 1.5, 0.0)
 		var has_los := _has_line_of_sight(player.global_position)
 		if has_los:
-			_add_debug_segment(eye_pos, p_pos, Color(1.0, 1.0, 1.0, 1.0)) # LOS CLEAR
+			_add_debug_segment(eye_pos, p_pos, Color(1.0, 1.0, 1.0, 1.0))
 		else:
-			_add_debug_segment(eye_pos, p_pos, Color(1.0, 1.0, 1.0, 0.3)) # LOS BLOCKED
+			_add_debug_segment(eye_pos, p_pos, Color(1.0, 1.0, 1.0, 0.3))
 
-	# Garis Jalur Navigasi A* & Target
 	var start_path := global_position + Vector3(0.0, 0.08, 0.0)
 	for i in range(current_path_index, current_path.size()):
 		var target_pt := current_path[i] + Vector3(0.0, 0.08, 0.0)
 		_add_debug_segment(start_path, target_pt, Color(1.0, 1.0, 1.0, 0.7))
 		start_path = target_pt
 
-	# Marker silang di target tujuan
 	var tp := target_position + Vector3(0.0, 0.1, 0.0)
 	var ms := 0.45
 	_add_debug_segment(tp + Vector3(-ms, 0, 0), tp + Vector3(ms, 0, 0), Color(1.0, 1.0, 1.0, 0.85))
