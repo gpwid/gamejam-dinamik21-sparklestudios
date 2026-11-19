@@ -27,7 +27,6 @@ var is_clicking: bool = false
 
 var jolt_tween: Tween
 
-# Warna visualisasi senter
 const COLOR_LIT: Color = Color(1.0, 1.0, 1.0, 1.0)
 const COLOR_DIM: Color = Color(0.25, 0.25, 0.3, 1.0)
 const COLOR_OVERHEAT: Color = Color(0.9, 0.2, 0.2, 1.0)
@@ -36,13 +35,11 @@ var is_flashlight_lit: bool = false
 var is_overheated_visual: bool = false
 var current_hand_color: Color = COLOR_DIM
 
-# Kelelahan & Pandangan Buram (Screen Blur)
 var is_exhausted: bool = false
 var is_recovering_from_exhaustion: bool = false
 var blur_intensity: float = 0.0
 var target_blur_intensity: float = 0.0
 
-# Pengaturan Bobbing Jalan & Bernapas (Idle)
 const BREATH_FREQUENCY: float = 4.3
 const BREATH_AMPLITUDE_PX: float = 4.0
 
@@ -60,7 +57,6 @@ var walk_bob_weight: float = 0.0
 var current_bob: Vector2 = Vector2.ZERO
 var current_left_bob: Vector2 = Vector2.ZERO
 
-# Sistem Menahan Napas & Zona Monster
 var is_holding_breath: bool = false
 var hold_breath_stamina_ratio: float = 1.0
 var fear_tremor_intensity: float = 0.0
@@ -89,7 +85,6 @@ func _update_pivot() -> void:
 		left_hand_texture.pivot_offset = left_hand_texture.size * Vector2(0.25, 0.95)
 
 func _process(delta: float) -> void:
-	# 1. Update efek visual kelelahan (Screen Blur dinamis & halus)
 	var dynamic_target_blur: float = target_blur_intensity
 	if is_holding_breath and hold_breath_stamina_ratio < 0.35:
 		var low_stam_factor: float = (0.35 - hold_breath_stamina_ratio) / 0.35
@@ -99,7 +94,6 @@ func _process(delta: float) -> void:
 	if dynamic_target_blur == 0.0 and blur_intensity < 0.005:
 		blur_intensity = 0.0
 
-	# 2. Denyut 1-Bit White Static Vignette seirama detak jantung
 	heartbeat_pulse = move_toward(heartbeat_pulse, 0.0, 3.0 * delta)
 	var target_static: float = 0.0
 	if fear_tremor_intensity > 0.001:
@@ -123,7 +117,6 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(hand_texture) and not is_instance_valid(left_hand_texture):
 		return
 
-	# 3. Gerak tangan Idle Breathing / Berjalan / Menahan Napas
 	if not is_holding_breath:
 		breath_time += BREATH_FREQUENCY * delta
 		var idle_bob := Vector2(
@@ -148,21 +141,17 @@ func _process(delta: float) -> void:
 		var target_left_bob := Vector2(-target_bob.x, target_bob.y)
 		current_left_bob = current_left_bob.lerp(target_left_bob, clampf(10.0 * delta, 0.0, 1.0))
 	else:
-		# Saat menahan napas: idle bobbing beku total dan tangan ditarik rapat ke dalam & ke bawah (postur kaku/tegang)
+		# pull hands down and freeze bobbing while holding breath
 		var tense_right := Vector2(-8.0, 14.0)
 		var tense_left := Vector2(8.0, 14.0)
 		current_bob = current_bob.lerp(tense_right, clampf(12.0 * delta, 0.0, 1.0))
 		current_left_bob = current_left_bob.lerp(tense_left, clampf(12.0 * delta, 0.0, 1.0))
 
-	# 4. Fear Tremor Jitter (getaran ketakutan diegetik pada kedua tangan)
 	var tremor_amp: float = 0.0
 	if not is_holding_breath:
-		# Saat tidak tahan napas: tangan bergetar jelas seiring mendekatnya monster
 		tremor_amp = fear_tremor_intensity * 4.2
 	else:
-		# Saat menahan napas: getaran ketakutan ditekan sedikit agar terasa menahan diri
 		tremor_amp = fear_tremor_intensity * 1.5
-		# Ketika stamina menipis (< 35%), getaran kehabisan napas (asphyxiation) mengguncang tangan dengan keras
 		if hold_breath_stamina_ratio < 0.35:
 			var low_stam_factor: float = (0.35 - hold_breath_stamina_ratio) / 0.35
 			tremor_amp += low_stam_factor * 6.0
@@ -171,11 +160,9 @@ func _process(delta: float) -> void:
 	if tremor_amp > 0.05:
 		jitter = Vector2(randf_range(-tremor_amp, tremor_amp), randf_range(-tremor_amp, tremor_amp))
 
-	# Terapkan ke tangan kanan jika tidak sedang animasi snap
 	if is_instance_valid(hand_texture) and not is_snapping:
 		hand_texture.position = current_bob + jitter
 
-	# Terapkan ke tangan kiri jika tidak sedang animasi klik tombol
 	if is_instance_valid(left_hand_texture) and not is_clicking:
 		left_hand_texture.position = current_left_bob + jitter
 
@@ -281,9 +268,6 @@ func _update_hand_modulate(delta: float = 0.0) -> void:
 	if is_instance_valid(left_hand_texture):
 		left_hand_texture.modulate = current_hand_color
 
-# ==============================================================================
-# ALUR ANIMASI KLIK SENTER TANGAN KIRI (SPAM-CLICK RESPONSIVE TWEEN)
-# ==============================================================================
 func play_flashlight_click() -> void:
 	if not is_instance_valid(left_hand_texture):
 		return
@@ -332,9 +316,6 @@ func play_tap_recoil() -> void:
 	snap_tween.tween_property(hand_texture, "position:y", current_bob.y + 20.0, 0.08)
 	snap_tween.tween_property(hand_texture, "position:y", current_bob.y, 0.16)
 
-# ==============================================================================
-# ALUR ANIMASI SNAP JENTIK JARI (TWEEN ECHOLOCATION)
-# ==============================================================================
 func play_snap_animation(on_snap: Callable = Callable(), on_complete: Callable = Callable()) -> void:
 	if not is_instance_valid(hand_texture):
 		if on_snap.is_valid():

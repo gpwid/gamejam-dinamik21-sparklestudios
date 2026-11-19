@@ -17,28 +17,23 @@ var twitch_timer: float = 3.0
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
-	# Simpan referensi dasar pencahayaan FNAF & rotasi monster
 	if fnaf_spot_light:
 		base_light_pos = fnaf_spot_light.position
 		base_light_energy = fnaf_spot_light.light_energy
 	if monster_node:
 		base_monster_rot = monster_node.rotation_degrees
 
-	# Terapkan shader khusus noir monster (tubuh putih, outline jelas, mata bersinar)
 	_apply_noir_shader_to_monster()
 
-	# Sinkronisasi shader outline pass pada kamera
 	if outline_pass:
 		outline_mat = outline_pass.get_active_material(0) as ShaderMaterial
 		if outline_mat and fnaf_spot_light:
 			outline_mat.set_shader_parameter("flashlight_on", true)
 			_sync_outline_light()
 
-	# Hubungkan sinyal dari UI 2D
 	if ui and ui.has_signal("brightness_changed"):
 		ui.brightness_changed.connect(_on_brightness_changed)
 
-	# Inisialisasi animasi monster
 	_init_monster_animation()
 
 func _apply_noir_shader_to_monster() -> void:
@@ -65,22 +60,18 @@ func _apply_monster_mats_recursive(node: Node, body_mat: Material, face_mat: Mat
 		_apply_monster_mats_recursive(child, body_mat, face_mat)
 
 func _process(delta: float) -> void:
-	# 1. Efek Pencahayaan FNAF (Cahaya bergerak lambat + flicker misterius)
 	if fnaf_spot_light:
 		light_anim_time += delta
 		var sway_x := sin(light_anim_time * 0.75) * 0.12
 		var sway_y := cos(light_anim_time * 0.95) * 0.08
 		fnaf_spot_light.position = base_light_pos + Vector3(sway_x, sway_y, 0.0)
 
-		# Flicker halus
 		var flicker := sin(light_anim_time * 3.2) * 0.15 + cos(light_anim_time * 5.7) * 0.08
 		if randf() < 0.025:
 			flicker -= 0.6
 		fnaf_spot_light.light_energy = maxf(0.8, base_light_energy + flicker)
-
 		_sync_outline_light()
 
-	# 2. Animasi Twitch Monster (ala Animatronics FNAF title screen)
 	twitch_timer -= delta
 	if twitch_timer <= 0.0:
 		twitch_timer = randf_range(3.5, 6.5)

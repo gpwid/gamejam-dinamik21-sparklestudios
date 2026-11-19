@@ -19,19 +19,16 @@ func _ready() -> void:
 	original_rotation = target_visual.rotation_degrees
 
 func interact(player: Node = null) -> void:
-	# Pastikan target_visual terinisialisasi
 	if not target_visual:
 		target_visual = self
 		original_scale = target_visual.scale
 		original_rotation = target_visual.rotation_degrees
 
-	# Jika player diteruskan dan senternya mati, alihkan ke interaksi gelap
 	if player and ("flashlight" in player):
 		if not player.flashlight.visible or player.is_overheated:
 			interact_in_dark(player)
 			return
 
-	print("Berhasil berinteraksi dengan objek!")
 	is_toggled = not is_toggled
 
 	var target_scale: Vector3 = original_scale * (1.35 if is_toggled else 1.0)
@@ -52,6 +49,5 @@ func interact(player: Node = null) -> void:
 		target_visual.rotation_degrees.y = target_rot_y
 
 func interact_in_dark(player: Node = null) -> void:
-	print("Gelap gulita! Nyalakan senter untuk berinteraksi.")
 	if player and ("landing_spring_vel" in player):
 		player.landing_spring_vel -= 0.7

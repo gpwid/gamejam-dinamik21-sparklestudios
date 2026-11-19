@@ -3,6 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://cqcxmvgtc8ds2" path="res://assets/3d/broken_tables.glb" id="1_4hxdk"]
 [ext_resource type="Material" uid="uid://c8k2naprop001" path="res://assets/material/noir_prop.tres" id="2_my4py"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_broken_tables"]
+size = Vector3(12.506, 8.11, 7.297)
+
 [node name="broken_tables" unique_id=218783234 instance=ExtResource("1_4hxdk")]
 
 [node name="Cube_012" parent="." index="0" unique_id=2138312926]
@@ -13,3 +16,9 @@ surface_material_override/0 = ExtResource("2_my4py")
 
 [node name="Cube_021" parent="." index="2" unique_id=468587122]
 surface_material_override/0 = ExtResource("2_my4py")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." index="3"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.262, 1.716, 0.129)
+shape = SubResource("BoxShape3D_broken_tables")

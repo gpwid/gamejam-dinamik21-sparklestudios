@@ -58,7 +58,6 @@ func _play_video(idx: int) -> void:
 			video_player.volume_db = 0.0
 			video_player.play()
 		else:
-			# Fallback jika file video belum ada
 			_on_video_finished()
 	else:
 		_transition_to_main_menu()
@@ -76,7 +75,6 @@ func _transition_to_video(next_idx: int) -> void:
 	if active_tween and active_tween.is_valid():
 		active_tween.kill()
 
-	# 1. Fade-out video saat ini ke warna hitam & fade-out audio
 	if fade_rect:
 		fade_rect.color = Color(0.0, 0.0, 0.0, 1.0)
 
@@ -87,7 +85,6 @@ func _transition_to_video(next_idx: int) -> void:
 	if video_player:
 		active_tween.tween_property(video_player, "volume_db", -40.0, 0.35)
 
-	# 2. Ganti video dan fade-in kembali
 	active_tween.chain().tween_callback(func():
 		current_video_index = next_idx
 		_play_video(current_video_index)
@@ -99,26 +96,21 @@ func _transition_to_video(next_idx: int) -> void:
 	)
 
 func _transition_to_main_menu() -> void:
+	if is_transitioning:
+		return
 	is_transitioning = true
+
 	if active_tween and active_tween.is_valid():
 		active_tween.kill()
-
-	# 1. Fade-out video headphone langsung ke hitam (0.35 detik) & fade-out audio
-	if fade_rect:
-		fade_rect.color = Color(0.0, 0.0, 0.0, 1.0)
 
 	active_tween = create_tween()
 	active_tween.set_parallel(true)
 	if fade_rect:
-		active_tween.tween_property(fade_rect, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		fade_rect.color = Color(0.0, 0.0, 0.0, 1.0)
+		active_tween.tween_property(fade_rect, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if video_player:
-		active_tween.tween_property(video_player, "volume_db", -40.0, 0.35)
+		active_tween.tween_property(video_player, "volume_db", -40.0, 0.45)
 
-	# 2. Begitu fade-out hitam selesai, langsung beralih ke Main Menu (tanpa layar abu-abu)
 	active_tween.chain().tween_callback(func():
-		if video_player:
-			video_player.stop()
-		if skip_hint:
-			skip_hint.visible = false
 		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
 	)

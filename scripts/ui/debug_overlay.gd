@@ -22,6 +22,9 @@ func _ready() -> void:
 	_update_ui_state()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build():
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F3 or event.keycode == KEY_F1:
 			_toggle_debug()
@@ -36,10 +39,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func auto_activate_switches() -> void:
 	var switches := get_tree().get_nodes_in_group("switch")
 	if switches.is_empty():
-		print("[DEBUG] Tidak ada saklar di dalam map.")
 		return
-	
-	print("[DEBUG F4] Mengaktifkan semua %d saklar secara otomatis..." % switches.size())
+
+	print("[debug] auto activating %d switches" % switches.size())
 	_ensure_player_ref()
 	for sw in switches:
 		if sw is FacilitySwitch and not sw.is_on:
@@ -50,41 +52,36 @@ func teleport_to_exit_door() -> void:
 	var exit_door := get_tree().get_first_node_in_group("exit_door") as ExitDoor
 	if not exit_door:
 		exit_door = get_tree().root.find_child("ExitDoor", true, false) as ExitDoor
-	
+
 	if not exit_door:
-		print("[DEBUG F5] ExitDoor tidak ditemukan di scene.")
 		return
-	
+
 	if player and is_instance_valid(player):
-		# Pintu berada di exit_door.global_position.
-		# Di door.tscn, ruangan cahaya berada di arah +Z (EscapeTrigger z=12).
-		# Koridor menghadap pintu berada di arah -Z (mundur 3.5 meter dari pintu).
+		# spawn 3.5m back from the doorway facing in
 		var door_forward: Vector3 = (exit_door.global_transform.basis * Vector3(0, 0, 1)).normalized()
 		var target_pos: Vector3 = exit_door.global_position - door_forward * 3.5
 		target_pos.y = maxf(exit_door.global_position.y + 0.1, 0.2)
-		
+
 		player.global_position = target_pos
 		player.velocity = Vector3.ZERO
-		
-		# Arahkan pandangan pemain langsung ke pintu
+
 		var to_door := (exit_door.global_position - target_pos).normalized()
 		player.rotation.y = atan2(-to_door.x, -to_door.z)
 		if player.has_node("Head"):
 			player.get_node("Head").rotation.x = 0.0
-		
-		print("[DEBUG F5] Pemain berhasil diteleportasi ke depan Exit Door (%s)!" % target_pos)
+
+		print("[debug] teleported to exit door: ", target_pos)
 
 func _toggle_debug() -> void:
 	is_debug_active = !is_debug_active
 	_ensure_monster_ref()
 	if monster and is_instance_valid(monster):
 		monster.debug_enabled = is_debug_active
-	
-	# Update bounding box visual semua saklar di level
+
 	for sw in get_tree().get_nodes_in_group("switch"):
 		if sw.has_method("set_debug_enabled"):
 			sw.set_debug_enabled(is_debug_active)
-			
+
 	_update_ui_state()
 
 func _update_ui_state() -> void:
@@ -95,13 +92,11 @@ func _process(delta: float) -> void:
 	if not is_debug_active:
 		return
 
-	# 1. Update Frame Rate
 	var fps := Engine.get_frames_per_second()
 	var frame_ms := delta * 1000.0
 	if fps_label:
 		fps_label.text = "FPS: %d (%.1f ms)" % [fps, frame_ms]
 
-	# 2. Update Monster Info
 	_ensure_monster_ref()
 	_ensure_player_ref()
 
@@ -109,7 +104,6 @@ func _process(delta: float) -> void:
 		if not monster.debug_enabled:
 			monster.debug_enabled = true
 
-		# State
 		if state_label:
 			var s_name := "PATROL"
 			match monster.current_state:
@@ -123,7 +117,6 @@ func _process(delta: float) -> void:
 					s_name = "JUMPSCARE"
 			state_label.text = "STATE: %s" % s_name
 
-		# Distance
 		if dist_label:
 			if player and is_instance_valid(player):
 				var d := monster.global_position.distance_to(player.global_position)
@@ -131,18 +124,13 @@ func _process(delta: float) -> void:
 			else:
 				dist_label.text = "JARAK: N/A"
 
-		# Line of Sight
 		if los_label:
 			if player and is_instance_valid(player):
 				var has_los: bool = monster._has_line_of_sight(player.global_position)
-				if has_los:
-					los_label.text = "PANDANGAN: TERLIHAT (CLEAR)"
-				else:
-					los_label.text = "PANDANGAN: TERHALANG DINDING"
+				los_label.text = "PANDANGAN: " + ("TERLIHAT" if has_los else "TERHALANG DINDING")
 			else:
 				los_label.text = "PANDANGAN: N/A"
 
-		# Target & Path
 		if target_label:
 			var rem_path := monster.current_path.size() - monster.current_path_index
 			rem_path = maxi(0, rem_path)
@@ -153,15 +141,11 @@ func _process(delta: float) -> void:
 			]
 	else:
 		if state_label:
-			state_label.text = "STATE: MONSTER TIDAK DITEMUKAN"
+			state_label.text = "STATE: N/A"
 
-	# 3. Update Player Status
 	if breath_label:
 		if player and is_instance_valid(player) and "is_holding_breath" in player:
-			if player.is_holding_breath:
-				breath_label.text = "NAPAS: MENAHAN NAPAS (SHIFT)"
-			else:
-				breath_label.text = "NAPAS: NORMAL (BERNAPAS)"
+			breath_label.text = "NAPAS: " + ("TAHAN (SHIFT)" if player.is_holding_breath else "NORMAL")
 
 func _ensure_monster_ref() -> void:
 	if monster == null or not is_instance_valid(monster):

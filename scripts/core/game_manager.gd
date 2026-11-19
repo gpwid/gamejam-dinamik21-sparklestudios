@@ -1,8 +1,5 @@
 extends Node
 
-# ==============================================================================
-# ENUM & VARIABLES: DIFFICULTY
-# ==============================================================================
 enum Difficulty {
 	EASY,
 	NORMAL,
@@ -11,6 +8,15 @@ enum Difficulty {
 }
 
 var current_difficulty: Difficulty = Difficulty.NORMAL
+
+const RECORDS_PATH: String = "user://records.cfg"
+var _config_file: ConfigFile = ConfigFile.new()
+var best_times: Dictionary = {
+	Difficulty.EASY: 0.0,
+	Difficulty.NORMAL: 0.0,
+	Difficulty.HARD: 0.0,
+	Difficulty.EXTREME: 0.0
+}
 
 func get_difficulty_name() -> String:
 	match current_difficulty:
@@ -54,23 +60,20 @@ func get_monster_hearing_multiplier() -> float:
 
 func get_player_breath_drain_rate() -> float:
 	match current_difficulty:
-		Difficulty.EASY: return 5.0      # ~20 detik tahan napas
-		Difficulty.NORMAL: return 7.5    # ~13.3 detik tahan napas
-		Difficulty.HARD: return 12.0     # ~8.3 detik tahan napas
-		Difficulty.EXTREME: return 18.0  # ~5.5 detik tahan napas
+		Difficulty.EASY: return 5.0
+		Difficulty.NORMAL: return 7.5
+		Difficulty.HARD: return 12.0
+		Difficulty.EXTREME: return 18.0
 	return 7.5
 
 func get_player_recovery_rate() -> float:
 	match current_difficulty:
-		Difficulty.EASY: return 24.0     # Cepat pulih (~4.2 detik)
-		Difficulty.NORMAL: return 18.0   # Standar (~5.5 detik)
-		Difficulty.HARD: return 13.5     # Lambat (~7.4 detik)
-		Difficulty.EXTREME: return 9.0   # Sangat lambat (~11.1 detik)
+		Difficulty.EASY: return 24.0
+		Difficulty.NORMAL: return 18.0
+		Difficulty.HARD: return 13.5
+		Difficulty.EXTREME: return 9.0
 	return 18.0
 
-# ==============================================================================
-# MUSIC & AUDIO MANAGER
-# ==============================================================================
 const MENU_MUSIC: AudioStream = preload("res://assets/audio/music/menu_music.mp3")
 const INGAME_1: AudioStream = preload("res://assets/audio/music/in-game_1.mp3")
 const INGAME_2: AudioStream = preload("res://assets/audio/music/in_game_2.mp3")
@@ -94,6 +97,48 @@ var base_volume_db: float = -6.0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_players()
+	load_records()
+
+func load_records() -> void:
+	var err := _config_file.load(RECORDS_PATH)
+	if err == OK:
+		best_times[Difficulty.EASY] = float(_config_file.get_value("best_time", "easy", 0.0))
+		best_times[Difficulty.NORMAL] = float(_config_file.get_value("best_time", "normal", 0.0))
+		best_times[Difficulty.HARD] = float(_config_file.get_value("best_time", "hard", 0.0))
+		best_times[Difficulty.EXTREME] = float(_config_file.get_value("best_time", "extreme", 0.0))
+
+func get_best_time(diff: Difficulty) -> float:
+	return float(best_times.get(diff, 0.0))
+
+func format_time(seconds: float) -> String:
+	if seconds <= 0.0:
+		return "--:--"
+	var minutes := int(seconds) / 60
+	var secs := int(seconds) % 60
+	return "%02d:%02d" % [minutes, secs]
+
+func get_best_time_string(diff: Difficulty) -> String:
+	return format_time(get_best_time(diff))
+
+func save_best_time(diff: Difficulty, elapsed: float) -> bool:
+	if elapsed <= 0.0:
+		return false
+	var current_best: float = get_best_time(diff)
+	var is_new_record: bool = (current_best <= 0.0 or elapsed < current_best)
+	if is_new_record:
+		best_times[diff] = elapsed
+		var key_name: String = _get_diff_key(diff)
+		_config_file.set_value("best_time", key_name, elapsed)
+		_config_file.save(RECORDS_PATH)
+	return is_new_record
+
+func _get_diff_key(diff: Difficulty) -> String:
+	match diff:
+		Difficulty.EASY: return "easy"
+		Difficulty.NORMAL: return "normal"
+		Difficulty.HARD: return "hard"
+		Difficulty.EXTREME: return "extreme"
+	return "normal"
 
 func _setup_audio_players() -> void:
 	music_player_a = AudioStreamPlayer.new()
@@ -131,16 +176,14 @@ func set_ducked(duck: bool, speed: float = 0.5) -> void:
 	is_ducked = duck
 	if active_player == null or not active_player.playing:
 		return
-	
+
 	if active_tween and active_tween.is_valid():
 		active_tween.kill()
 	active_tween = create_tween()
-	
+
 	if is_ducked:
-		# Duck/fade-out halus saat momen gameplay penting (chase / heartbeat / escape)
 		active_tween.tween_property(active_player, "volume_db", -80.0, speed).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	else:
-		# Fade-in kembali secara natural saat situasi tenang
 		active_tween.tween_property(active_player, "volume_db", base_volume_db, maxf(speed, 1.8)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func stop_music(fade_duration: float = 0.8) -> void:
@@ -163,7 +206,6 @@ func set_music_volume_percent(percent: float) -> void:
 	if percent <= 0.0:
 		base_volume_db = -80.0
 	else:
-		# Range -28 dB sampai 0 dB
 		base_volume_db = -28.0 + (percent / 100.0) * 28.0
 	if not is_ducked and active_player:
 		active_player.volume_db = base_volume_db
@@ -171,7 +213,7 @@ func set_music_volume_percent(percent: float) -> void:
 func _crossfade_to_stream(stream: AudioStream, duration: float) -> void:
 	if stream == null:
 		return
-	
+
 	var outgoing := active_player
 	var incoming := music_player_b if active_player == music_player_a else music_player_a
 	active_player = incoming
@@ -183,7 +225,7 @@ func _crossfade_to_stream(stream: AudioStream, duration: float) -> void:
 	if active_tween and active_tween.is_valid():
 		active_tween.kill()
 	active_tween = create_tween().set_parallel(true)
-	
+
 	active_tween.tween_property(incoming, "volume_db", base_volume_db, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if outgoing and outgoing.playing:
 		active_tween.tween_property(outgoing, "volume_db", -80.0, duration * 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -191,11 +233,9 @@ func _crossfade_to_stream(stream: AudioStream, duration: float) -> void:
 
 func _on_music_finished() -> void:
 	if current_context == MusicContext.MENU:
-		# Replay menu music
 		if active_player:
 			active_player.play()
 	elif current_context == MusicContext.INGAME:
-		# Crossfade secara natural antara INGAME_1 dan INGAME_2
 		current_ingame_index = 1 if current_ingame_index == 0 else 0
 		var next_stream: AudioStream = INGAME_2 if current_ingame_index == 1 else INGAME_1
 		_crossfade_to_stream(next_stream, 3.0)

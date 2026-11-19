@@ -8,11 +8,11 @@
 [ext_resource type="PackedScene" uid="uid://mxqhg361uqtq" path="res://assets/3d/crt_monitor_2.glb" id="6_fx25m"]
 [ext_resource type="PackedScene" uid="uid://c6lqwpfauyynu" path="res://assets/3d/cupboard.glb" id="7_iyb38"]
 [ext_resource type="PackedScene" uid="uid://bkvsljkp107ow" path="res://assets/3d/switch.glb" id="8_kfqbs"]
-[ext_resource type="PackedScene" path="res://assets/3d/tables.glb" id="9_w1g2n"]
+[ext_resource type="PackedScene" uid="uid://2jid1n3xi8b4" path="res://assets/3d/table.glb" id="9_w1g2n"]
 [ext_resource type="PackedScene" uid="uid://dkca5q8ofi7u5" path="res://assets/3d/lever.glb" id="10_pwjm5"]
 [ext_resource type="PackedScene" uid="uid://b4b4xjtfi7iyx" path="res://assets/3d/rack.glb" id="11_51qdv"]
-[ext_resource type="PackedScene" path="res://assets/3d/Kursi.glb" id="12_4bhi4"]
-[ext_resource type="PackedScene" path="res://assets/3d/kasur.glb" id="13_ctoua"]
+[ext_resource type="PackedScene" uid="uid://n2c7lrl4f6o5" path="res://assets/3d/chair.glb" id="12_4bhi4"]
+[ext_resource type="PackedScene" uid="uid://rl5xqtqsnyjk" path="res://assets/3d/bed.glb" id="13_ctoua"]
 [ext_resource type="PackedScene" path="res://scenes/characters/monster.tscn" id="14_monster"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_eno46"]
@@ -69,6 +69,24 @@ use_collision = true
 size = Vector3(20, 0.05, 20)
 material = SubResource("ShaderMaterial_eno46")
 
+[node name="CSGBox3D_South" type="CSGBox3D" parent="." unique_id=1982736411]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.771, 9.975)
+use_collision = true
+size = Vector3(20.5, 6, 0.5)
+material = SubResource("ShaderMaterial_eno46")
+
+[node name="CSGBox3D_West" type="CSGBox3D" parent="." unique_id=1982736412]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.975, 2.771, 0)
+use_collision = true
+size = Vector3(0.5, 6, 20.5)
+material = SubResource("ShaderMaterial_eno46")
+
+[node name="CSGBox3D_East" type="CSGBox3D" parent="." unique_id=1982736413]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.975, 2.771, 0)
+use_collision = true
+size = Vector3(0.5, 6, 20.5)
+material = SubResource("ShaderMaterial_eno46")
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=885196880]
 environment = SubResource("Environment_ol4vb")
 
@@ -83,7 +101,7 @@ transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0.8853972, -0.121294
 [node name="Monitor tabung1" parent="." unique_id=2102185628 instance=ExtResource("5_q1j05")]
 transform = Transform3D(0.11225156, 0, -0.01887149, 0, 0.11471193, 0, 0.022230307, 0, 0.09529127, 1.2577977, 0.5683279, -2.7579455)
 
-[node name="Kubus_001" parent="Monitor tabung1" index="0" unique_id=382640150]
+[node name="Kubus_001" parent="Monitor tabung1/Kubus_004" index="0" unique_id=382640150]
 transform = Transform3D(1.882759, 0, -2.9802322e-08, 0, 1.6849236, 0, -2.9802322e-08, 0, 1.419117, 0, 0, 0)
 surface_material_override/0 = ExtResource("3_q1j05")
 
@@ -137,13 +155,8 @@ shape = SubResource("ConcavePolygonShape3D_w1g2n")
 [node name="Meja" parent="." unique_id=1007415731 instance=ExtResource("9_w1g2n")]
 transform = Transform3D(0.107986376, 0, -0.10386101, 0, 0.14982712, 0, 0.10386101, 0, 0.107986376, -1.9537055, -0.08834612, -2.4338336)
 
-[node name="Kubus_002" parent="Meja" index="0" unique_id=2000042612]
+[node name="table-big" parent="Meja" index="0"]
 surface_material_override/0 = ExtResource("3_q1j05")
-
-[node name="StaticBody3D" type="StaticBody3D" parent="Meja/Kubus_002" index="0" unique_id=363294662]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Meja/Kubus_002/StaticBody3D" unique_id=1978834037]
-shape = SubResource("ConcavePolygonShape3D_pwjm5")
 
 [node name="Lever" parent="." unique_id=589360013 instance=ExtResource("10_pwjm5")]
 transform = Transform3D(0.1, 0, -4.9683715e-09, 0, 0.1, 0, 4.9683715e-09, 0, 0.1, -1.1754786, 0.88936144, -2.8181586)
