@@ -32,11 +32,11 @@ ambient_light_source = 1
 [node name="Map" unique_id=1637975497 instance=ExtResource("1_p01ix")]
 script = ExtResource("1_map_script")
 
-[node name="Atap" parent="." index="0" unique_id=1890212918]
-transform = Transform3D(0.54, 0, 0, 0, 0.54, 0, 0, 0, 0.54, 0, -0.754911, 0)
+[node name="Atap" parent="." index="0" unique_id=559168249]
+transform = Transform3D(0.54, 0, 0, 0, 0.54, 0, 0, 0, 0.54, -9.448307, 1.8610244, -7.392773)
 material_override = ExtResource("2_t2abx")
 
-[node name="Dinding" parent="." index="1" unique_id=357441152]
+[node name="Dinding" parent="." index="1" unique_id=1720785068]
 transform = Transform3D(0.54, 0, 0, 0, 0.54, 0, 0, 0, 0.54, 0, 0, 0)
 material_override = ExtResource("2_t2abx")
 
@@ -45,7 +45,7 @@ material_override = ExtResource("2_t2abx")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Dinding/StaticBody3D" index="0" unique_id=123457734]
 shape = SubResource("ConcavePolygonShape3D_dinding")
 
-[node name="Lantai" parent="." index="2" unique_id=382052739]
+[node name="Lantai" parent="." index="2" unique_id=288020796]
 transform = Transform3D(0.54, 0, 0, 0, 0.54, 0, 0, 0, 0.54, 0, 0, 0)
 material_override = ExtResource("2_t2abx")
 
@@ -191,10 +191,13 @@ transform = Transform3D(0.9448225, 0, 0, 0, 0.9920634, 0, 0, 0, 1.1428572, 0.157
 [node name="crt_monitor_1" parent="Workdesk4" index="1" unique_id=2049692326 instance=ExtResource("7_7bdfp")]
 transform = Transform3D(0.50390536, 0, 0, 0, 0.79365075, 0, 0, 0, 1.1428571, -0.6298809, 2.770498, 0)
 
-[node name="cupboard" parent="Workdesk4" index="2" unique_id=930129891 instance=ExtResource("8_3uyi8")]
+[node name="crt_monitor_2" parent="Workdesk4" index="2" unique_id=1420051623 instance=ExtResource("7_7bdfp")]
+transform = Transform3D(0.50390536, 0, 0, 0, 0.79365075, 0, -1.4210855e-14, 0, 1.142857, 1.3554935, 2.7704976, -4.7683716e-07)
+
+[node name="cupboard" parent="Workdesk4" index="3" unique_id=930129891 instance=ExtResource("8_3uyi8")]
 transform = Transform3D(-0.26234415, 0, 1.1732459e-08, 0, 0.37187278, 0, -2.6609175e-08, 0, -0.59499633, 3.2905712, -0.11748752, 13.885523)
 
-[node name="cupboard2" parent="Workdesk4" index="3" unique_id=817925005 instance=ExtResource("8_3uyi8")]
+[node name="cupboard2" parent="Workdesk4" index="4" unique_id=817925005 instance=ExtResource("8_3uyi8")]
 transform = Transform3D(-0.26234415, 0, 1.1732459e-08, 0, 0.37187278, 0, -2.6609168e-08, 0, -0.59499633, -4.5829496, -0.11748752, 13.885523)
 
 [node name="Workdesk3" type="Node3D" parent="." index="13" unique_id=1973335255]
